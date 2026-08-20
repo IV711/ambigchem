@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ambigchem"
+version = "0.1.0"
+description = "A disambiguation-first chemistry name and formula resolution library"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "Madhumitha", email = "your-email-here@example.com"}
+]
+requires-python = ">=3.9"
+dependencies = []
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
