@@ -9,7 +9,7 @@ description = "A disambiguation-first chemistry name and formula resolution libr
 readme = "README.md"
 license = {text = "MIT"}
 authors = [
-    {name = "Madhumitha", email = "your-email-here@example.com"}
+    {name = "Madumitha I V", email = "madumithaot7@gmail.com"}
 ]
 requires-python = ">=3.9"
 dependencies = []
