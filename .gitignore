@@ -6,3 +6,8 @@ dist/
 .pytest_cache/
 .venv/
 venv/
+*.sdf
+*.sdf.gz
+*.db
+CID-Synonym-filtered.txt
+CID-Synonym-filtered.gz
