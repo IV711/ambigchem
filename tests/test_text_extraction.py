@@ -23,8 +23,10 @@ from ambigchem.text_extraction import (
     load_or_build_trie,
     discover_formula_matches,
     discover_suffix_candidates,
+    validate_suffix_candidates,
     DiscoveredMatch,
     SuffixCandidate,
+    ValidatedSuffixMatch,
 )
 
 
@@ -195,6 +197,51 @@ class TestPhase3SuffixCandidates:
     def test_no_chemical_suffixed_words_returns_empty(self):
         candidates = discover_suffix_candidates("The cat sat on the mat.")
         assert candidates == []
+
+
+class TestPhase4OpsinValidation:
+    """Phase 4: the step that actually redeems Phase 3's honestly-low
+    precision. Uses REAL OPSIN calls, not mocks - confirmed working
+    throughout organic.py's own test suite already."""
+
+    def test_real_chemical_is_validated_with_a_real_formula(self):
+        candidates = discover_suffix_candidates("The reaction used ethanol as solvent.")
+        validated = validate_suffix_candidates(candidates)
+        assert len(validated) == 1
+        assert validated[0].text == "ethanol"
+        assert validated[0].formula == "C2H6O"
+
+    def test_false_positive_is_correctly_rejected_not_validated(self):
+        """The direct proof Phase 4 does real work, not just pass-
+        through: 'indicate' is a real, documented Phase 3 false positive
+        (see TestPhase3SuffixCandidates) - it reaches this function but
+        OPSIN correctly refuses to validate it."""
+        candidates = discover_suffix_candidates("Please indicate your answer.")
+        assert len(candidates) == 1  # Phase 3 honestly lets it through
+        validated = validate_suffix_candidates(candidates)
+        assert validated == [], "OPSIN must correctly reject a non-chemical word"
+
+    def test_the_decisive_combined_case(self):
+        """THE real, decisive proof of the whole 4-phase design: one
+        sentence containing both a genuine chemical (ethanol) and a
+        documented false positive (indicate) - Phase 3 finds both,
+        Phase 4 correctly keeps only the real one."""
+        text = "Please indicate that ethanol was used in this reaction."
+        candidates = discover_suffix_candidates(text)
+        candidate_texts = {c.text.lower() for c in candidates}
+        assert "indicate" in candidate_texts
+        assert "ethanol" in candidate_texts
+
+        validated = validate_suffix_candidates(candidates)
+        validated_texts = [v.text for v in validated]
+        assert validated_texts == ["ethanol"], (
+            "Phase 4 must keep the real chemical and discard the false "
+            "positive - this is the entire point of the 4-phase design"
+        )
+        assert validated[0].formula == "C2H6O"
+
+    def test_no_candidates_returns_empty_validated_list(self):
+        assert validate_suffix_candidates([]) == []
 
 
 class TestRealDatabaseBackedTrie:
