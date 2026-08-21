@@ -12,7 +12,7 @@ authors = [
     {name = "Madhumitha", email = "your-email-here@example.com"}
 ]
 requires-python = ">=3.9"
-dependencies = []
+dependencies = ["ase>=3.22"]
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
