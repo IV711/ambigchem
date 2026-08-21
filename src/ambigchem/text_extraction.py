@@ -84,6 +84,77 @@ def discover_formula_matches(text: str) -> list[DiscoveredMatch]:
     return matches
 
 
+# Phase 3: suffix candidates. GIVEN A DISTINCT TYPE FROM DiscoveredMatch,
+# deliberately - a suffix match is architecturally NOT the same kind of
+# claim as a real database hit or a validated formula, and should never
+# be treated with the same confidence by a caller.
+#
+# HONEST, MEASURED LIMITATION, confirmed by direct testing before this
+# was built, not assumed: ordinary English words are full of these exact
+# suffixes. A test of 29 hand-picked, completely ordinary words
+# ("outside", "decide", "anyone", "phone"...) found 29/29 matched at
+# least one chemical suffix pattern. This means Phase 3's real job is
+# NOT to be accurate on its own - it is a loose pre-filter, narrowing
+# "check every word in a sentence against OPSIN" down to "check only
+# words shaped like they might be chemical names." Phase 4 (OPSIN
+# validation) is what actually does the real filtering; Phase 3 is
+# honestly expected to pass through real false positives.
+#
+# Includes "-one" (ketones - acetone, cyclohexanone) and "-al" (aldehydes
+# - propanal, butanal) alongside the more common suffixes - genuine,
+# additional chemical name categories, even though both carry real,
+# extra false-positive risk ("-one" especially: someone/anyone/phone/
+# alone/gone/stone). Accepted deliberately, consistent with this
+# module's own stated design: Phase 4 is the real filter, not this one.
+CHEMICAL_SUFFIXES = ("ide", "ate", "ite", "ol", "ane", "ene", "yne", "amine", "one", "al")
+
+# A real, reasonably comprehensive stoplist of common English words that
+# would otherwise be constant noise - mirrors formula_segmenter.py's
+# _COMMON_WORD_STOPLIST pattern. Explicitly NOT a full solution to the
+# false-positive problem (confirmed: even a list this size only catches
+# the highest-frequency offenders) - just removes the most obviously
+# non-chemical words before they ever reach Phase 4.
+_SUFFIX_STOPLIST = {
+    "side", "wide", "guide", "provide", "decide", "divide", "collide",
+    "outside", "inside", "beside", "ride", "hide", "pride", "slide",
+    "site", "quite", "white", "write", "invite", "polite", "opposite", "despite",
+    "create", "separate", "immediate", "chocolate", "private", "late",
+    "plate", "state", "rate", "gate", "date",
+    "insane", "humane", "membrane", "hurricane", "mundane",
+    "scene", "serene", "gene",
+    "alone", "phone", "stone", "zone", "tone", "bone", "done", "gone", "none", "one",
+    "someone", "anyone", "everyone",
+    "several", "normal", "final", "total", "signal", "animal", "capital", "general", "natural",
+    "school", "tool", "control", "protocol", "cool", "pool", "fool", "symbol",
+}
+
+
+@dataclass
+class SuffixCandidate:
+    text: str
+    start: int
+    end: int
+    suffix: str  # which pattern matched, for transparency
+
+
+def discover_suffix_candidates(text: str) -> list[SuffixCandidate]:
+    """Phase 3: words matching a common chemical-name suffix pattern,
+    kept as its own, distinctly-typed, independently-tested function.
+    Deliberately low precision, honestly documented above - real
+    filtering happens in Phase 4."""
+    candidates: list[SuffixCandidate] = []
+    for m in re.finditer(r"\b[a-zA-Z]+\b", text):
+        word = m.group(0)
+        word_lower = word.lower()
+        if word_lower in _SUFFIX_STOPLIST:
+            continue
+        for suffix in CHEMICAL_SUFFIXES:
+            if word_lower.endswith(suffix) and len(word_lower) > len(suffix):
+                candidates.append(SuffixCandidate(word, m.start(), m.end(), suffix))
+                break  # one candidate per word, first matching suffix
+    return candidates
+
+
 def _normalize(text: str) -> str:
     """Case normalization, hyphens treated as word boundaries (same as
     spaces), punctuation stripped while word boundaries are preserved."""

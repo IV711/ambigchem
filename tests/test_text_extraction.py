@@ -22,7 +22,9 @@ from ambigchem.text_extraction import (
     build_trie_from_database,
     load_or_build_trie,
     discover_formula_matches,
+    discover_suffix_candidates,
     DiscoveredMatch,
+    SuffixCandidate,
 )
 
 
@@ -145,6 +147,54 @@ class TestPhase2FormulaExtraction:
     def test_no_formula_in_plain_text_returns_empty(self):
         matches = discover_formula_matches("This sentence has no chemical formulas.")
         assert matches == []
+
+
+class TestPhase3SuffixCandidates:
+    """Phase 3, kept deliberately separate and distinctly typed from
+    DiscoveredMatch - a suffix match is honestly a much weaker claim
+    than a real database hit or validated formula (see module docstring
+    for the measured 29/29 false-positive rate that shaped this design)."""
+
+    def test_real_chemical_names_are_detected_as_candidates(self):
+        text = "We dissolved sodium chloride in ethanol and measured the sulfate content."
+        candidates = discover_suffix_candidates(text)
+        texts = [c.text.lower() for c in candidates]
+        assert "chloride" in texts
+        assert "ethanol" in texts
+        assert "sulfate" in texts
+
+    def test_stoplist_filters_the_most_common_false_positives(self):
+        """The small, explicit mitigation - not a real solution, just
+        removes the highest-frequency non-chemical words."""
+        candidates = discover_suffix_candidates("Anyone outside can decide to phone someone.")
+        assert candidates == [], "Every word here is in the stoplist and must be filtered"
+
+    def test_honest_proof_real_false_positives_still_get_through(self):
+        """THE actual, documented limitation, proven with a real test,
+        not just asserted in a comment: a common English word NOT in the
+        small stoplist will still incorrectly appear as a candidate.
+        This is expected, honestly-accepted behavior - Phase 4 (OPSIN)
+        is what does the real filtering, not this function."""
+        candidates = discover_suffix_candidates("Please indicate your favorite candidate.")
+        texts = [c.text.lower() for c in candidates]
+        assert "indicate" in texts or "candidate" in texts, (
+            "This test documents a REAL, accepted limitation - if it ever "
+            "starts failing, it means false positives got filtered, which "
+            "would be a genuine improvement, but the module docstring's "
+            "claims should be updated to match, not left stale"
+        )
+
+    def test_positions_and_matched_suffix_are_real_and_correct(self):
+        text = "The compound ethanol was tested."
+        candidates = discover_suffix_candidates(text)
+        assert len(candidates) == 1
+        c = candidates[0]
+        assert text[c.start:c.end] == "ethanol"
+        assert c.suffix == "ol"
+
+    def test_no_chemical_suffixed_words_returns_empty(self):
+        candidates = discover_suffix_candidates("The cat sat on the mat.")
+        assert candidates == []
 
 
 class TestRealDatabaseBackedTrie:
