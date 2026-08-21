@@ -24,9 +24,11 @@ from ambigchem.text_extraction import (
     discover_formula_matches,
     discover_suffix_candidates,
     validate_suffix_candidates,
+    extract_all,
     DiscoveredMatch,
     SuffixCandidate,
     ValidatedSuffixMatch,
+    ExtractedCompound,
 )
 
 
@@ -244,7 +246,72 @@ class TestPhase4OpsinValidation:
         assert validate_suffix_candidates([]) == []
 
 
-class TestRealDatabaseBackedTrie:
+class TestExtractAllFourPhasesCombined:
+    """The final, unified entry point - built only after all four phases
+    were independently proven correct. Uses REAL OPSIN calls (Phase 4),
+    not mocks."""
+
+    @pytest.fixture
+    def combined_test_trie(self):
+        """Includes a deliberately formula-shaped database entry
+        ('NaCl') specifically to construct a genuine cross-phase overlap
+        test - Phase 1 (database) and Phase 2 (formula regex) both find
+        the exact same span, and reconciliation must pick one, not
+        duplicate it."""
+        names = ["aspirin", "titanium dioxide", "NaCl"]
+        return marisa_trie.Trie([n.lower() for n in names])
+
+    def test_database_match_included(self, combined_test_trie):
+        results = extract_all("We tested aspirin today.", combined_test_trie)
+        assert any(r.text == "aspirin" and r.method == "database" for r in results)
+
+    def test_formula_match_included(self, combined_test_trie):
+        results = extract_all("The compound Fe2O3 was analyzed.", combined_test_trie)
+        assert any(r.text == "Fe2O3" and r.method == "formula" for r in results)
+
+    def test_opsin_validated_match_included_false_positive_excluded(self, combined_test_trie):
+        results = extract_all("Please indicate that ethanol was used.", combined_test_trie)
+        texts_and_methods = [(r.text, r.method) for r in results]
+        assert ("ethanol", "opsin_validated") in texts_and_methods
+        assert not any(r.text.lower() == "indicate" for r in results), (
+            "The false positive must never reach the final output"
+        )
+
+    def test_all_four_phases_together_in_one_sentence(self, combined_test_trie):
+        """Uses Fe2O3, not NaCl, for the formula check specifically -
+        NaCl is ALSO a database entry in this fixture, so it always,
+        correctly reconciles to method='database' (ties go to whichever
+        phase was checked first). Fe2O3 has no such conflict, so it
+        unambiguously proves the formula path works within the combined
+        pipeline."""
+        text = "We tested aspirin, Fe2O3, and ethanol, and please indicate the results."
+        results = extract_all(text, combined_test_trie)
+        methods_found = {r.method for r in results}
+        texts_found = {r.text for r in results}
+
+        assert "database" in methods_found
+        assert "formula" in methods_found
+        assert "opsin_validated" in methods_found
+        assert "aspirin" in texts_found
+        assert "Fe2O3" in texts_found
+        assert "ethanol" in texts_found
+        assert not any(t.lower() == "indicate" for t in texts_found)
+
+    def test_cross_phase_overlap_is_reconciled_not_duplicated(self, combined_test_trie):
+        """THE genuine architectural question this whole combining step
+        exists to answer: 'NaCl' is both a real database entry (Phase 1)
+        AND a real formula (Phase 2) in this test setup - both phases
+        independently find the exact same span. The final output must
+        contain it exactly once, not twice."""
+        results = extract_all("The sample contains NaCl.", combined_test_trie)
+        nacl_matches = [r for r in results if r.text.lower() == "nacl" or r.text == "NaCl"]
+        assert len(nacl_matches) == 1, "Cross-phase overlap must be reconciled to a single result"
+
+    def test_positions_remain_correct_in_combined_output(self, combined_test_trie):
+        text = "The compound ethanol was tested."
+        results = extract_all(text, combined_test_trie)
+        ethanol_match = next(r for r in results if r.text == "ethanol")
+        assert text[ethanol_match.start:ethanol_match.end] == "ethanol"
     """Proves build_trie_from_database() genuinely works against a real
     local_database.py instance, not just a hand-built trie - the actual
     real-world path this module is meant to run."""
