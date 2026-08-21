@@ -50,7 +50,10 @@ ROMAN_TO_INT: dict[str, int] = {
 
 # Fixed-charge cations: (symbol, charge, is_polyatomic). Main group
 # metals with one, reliable, real charge - plus ammonium, a real, common
-# polyatomic cation.
+# polyatomic cation. "scandium" added here (not as variable) after real
+# search evidence: appears consistently with NO Roman numeral across
+# real compound listings, consistent with Sc's well-established, always
+# +3 behavior, much like aluminum.
 FIXED_CATIONS: dict[str, tuple[str, int, bool]] = {
     "lithium": ("Li", 1, False), "sodium": ("Na", 1, False),
     "potassium": ("K", 1, False), "rubidium": ("Rb", 1, False),
@@ -61,20 +64,30 @@ FIXED_CATIONS: dict[str, tuple[str, int, bool]] = {
     "aluminum": ("Al", 3, False), "aluminium": ("Al", 3, False),
     "zinc": ("Zn", 2, False), "silver": ("Ag", 1, False),
     "cadmium": ("Cd", 2, False),
+    "scandium": ("Sc", 3, False),
     "ammonium": ("NH4", 1, True),
 }
 
 # Variable-charge cations: (symbol, [real possible charges]). Genuinely
-# multiple real oxidation states - the classic, near-universally-taught
-# examples. A real "needs individual verification" backlog exists for
-# less certain ones (chromium, manganese, cobalt, nickel, etc.) -
-# deliberately left out rather than guessed at, same discipline as the
-# transition-metal -ide names left out of covalent.py.
+# multiple real oxidation states - confirmed via direct search against
+# real compound listings (patents, Wikipedia), not assumed. titanium,
+# chromium, cobalt, manganese, nickel added after finding real, explicit
+# Roman-numeral usage (e.g. "chromium(II) iodide", "chromium(III)
+# iodide", "cobalt(III) iodide", "manganese(II) iodide") across extensive
+# real sources. Deliberately conservative: only the states directly
+# confirmed in real usage are included (e.g. manganese's real +4/+7
+# states, tied to specific oxide/oxyanion contexts like MnO2/permanganate
+# rather than typical simple binary salts, are left out).
 VARIABLE_CATIONS: dict[str, tuple[str, list[int]]] = {
     "iron": ("Fe", [2, 3]),
     "copper": ("Cu", [1, 2]),
     "tin": ("Sn", [2, 4]),
     "lead": ("Pb", [2, 4]),
+    "titanium": ("Ti", [3, 4]),
+    "chromium": ("Cr", [2, 3]),
+    "cobalt": ("Co", [2, 3]),
+    "manganese": ("Mn", [2, 3]),
+    "nickel": ("Ni", [2, 3]),
 }
 
 # Real, looked-up polyatomic anions - charge is not derivable from any

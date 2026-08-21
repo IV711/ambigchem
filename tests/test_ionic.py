@@ -57,6 +57,35 @@ def test_genuine_algorithmic_ambiguity_no_database_needed():
     assert set(result.all_candidates) == {"FeO", "Fe2O3"}
 
 
+def test_scandium_fixed_charge_confirmed_by_real_search():
+    """Confirmed via direct search: scandium appears consistently with
+    NO Roman numeral across real compound listings, consistent with its
+    well-established, always-+3 behavior, much like aluminum."""
+    assert parse_ionic_name("scandium chloride").formula == "ScCl3"
+
+
+def test_new_variable_cations_confirmed_by_real_search():
+    """titanium, chromium, cobalt, manganese, nickel - added after real
+    search evidence (explicit Roman-numeral usage in real compound
+    listings), not assumed from the regular naming pattern alone."""
+    assert parse_ionic_name("titanium(IV) chloride").formula == "TiCl4"  # real: titanium tetrachloride
+    assert parse_ionic_name("chromium(II) chloride").formula == "CrCl2"
+    assert parse_ionic_name("chromium(III) chloride").formula == "CrCl3"
+    assert parse_ionic_name("cobalt(III) oxide").formula == "Co2O3"
+
+
+def test_titanium_oxide_is_a_new_real_ambiguity_case():
+    """A genuinely new ambiguity this expansion enables: titanium could
+    be +3 or +4 (TiO2, titanium dioxide, is the far more commonly known
+    compound in casual usage - but algorithmically, without an explicit
+    oxidation state, both Ti2O3 and TiO2 are real, valid readings, and
+    flagging this honestly is more correct than silently assuming the
+    more 'famous' answer)."""
+    result = parse_ionic_name("titanium oxide")
+    assert result.ambiguous is True
+    assert set(result.all_candidates) == {"Ti2O3", "TiO2"}
+
+
 def test_invalid_input_returns_none():
     assert parse_ionic_name("not a real compound").formula is None
     assert parse_ionic_name("justoneword").formula is None
