@@ -9,7 +9,7 @@ description = "A disambiguation-first chemistry name and formula resolution libr
 readme = "README.md"
 license = {text = "MIT"}
 authors = [
-    {name = "Madumitha I V", email = "madumithaot7@gmail.com"}
+    {name = "Madhumitha", email = "your-email-here@example.com"}
 ]
 requires-python = ">=3.9"
 dependencies = []
@@ -21,6 +21,7 @@ classifiers = [
 
 [project.optional-dependencies]
 test = ["pytest>=7.0"]
+organic = ["py2opsin>=1.2.0", "rdkit>=2023.0"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
