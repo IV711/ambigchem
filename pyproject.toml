@@ -9,10 +9,10 @@ description = "A disambiguation-first chemistry name and formula resolution libr
 readme = "README.md"
 license = {text = "MIT"}
 authors = [
-    {name = "Madhumitha", email = "your-email-here@example.com"}
+    {name = "Madumitha", email = "madumithaot7@gmail.com"}
 ]
 requires-python = ">=3.9"
-dependencies = ["ase>=3.22"]
+dependencies = ["ase>=3.22", "marisa-trie>=1.0"]
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",

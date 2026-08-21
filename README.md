@@ -6,7 +6,7 @@ Unlike existing cheminformatics tools, which assume you already have a clean for
 
 ## Status
 
-Core library complete and tested — 11 real modules, 77 automated tests, all live-verified with real chemical data (including a genuine 1.4-million-record offline PubChem import). Pre-1.0, not yet published to PyPI.
+Core library complete and tested — 12 real modules, 88 automated tests, all live-verified with real chemical data (including a genuine 1.4-million-record offline PubChem import). Pre-1.0, not yet published to PyPI.
 
 ## What it does
 
@@ -86,7 +86,7 @@ Live-tested at real scale: a genuine run against this exact file range imported 
 pytest -v
 ```
 
-77 tests across all 11 modules. A handful of tests print real OPSIN warnings for deliberately invalid input — expected, not failures.
+88 tests across all 12 modules. A handful of tests print real OPSIN warnings for deliberately invalid input — expected, not failures.
 
 ## Known, honestly-documented limitations
 
