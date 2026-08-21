@@ -21,6 +21,7 @@ from ambigchem.text_extraction import (
     extract_compounds_from_text,
     build_trie_from_database,
     load_or_build_trie,
+    discover_formula_matches,
     DiscoveredMatch,
 )
 
@@ -101,6 +102,49 @@ def test_positions_are_real_and_correct(sample_trie):
 def test_no_match_returns_empty_list(sample_trie):
     matches = extract_compounds_from_text("This sentence has no chemicals in it.", sample_trie)
     assert matches == []
+
+
+class TestPhase2FormulaExtraction:
+    """Phase 2, kept deliberately separate per the layered build plan -
+    formula-shaped tokens (Fe2O3, NaCl, CuSO4), not database names."""
+
+    def test_finds_real_formula_in_sentence(self):
+        matches = discover_formula_matches("The formula for iron oxide is Fe2O3.")
+        assert [m.text for m in matches] == ["Fe2O3"]
+
+    def test_finds_multiple_formulas_in_one_sentence(self):
+        matches = discover_formula_matches("We used CuSO4 and NaCl in the experiment.")
+        assert [m.text for m in matches] == ["CuSO4", "NaCl"]
+
+    def test_positions_are_real_and_correct(self):
+        text = "The compound NaCl is common salt."
+        matches = discover_formula_matches(text)
+        assert len(matches) == 1
+        m = matches[0]
+        assert text[m.start:m.end] == "NaCl"
+
+    def test_adversarial_property_acronyms_still_correctly_rejected(self):
+        """The exact real bug this validation logic was originally built
+        to fix, now proven in full-sentence context, not just an
+        isolated token: HOMO/LUMO/DOS are syntactically formula-shaped
+        (every capital letter satisfies the pattern) but must be
+        rejected, since 'M' and 'D' aren't real element symbols."""
+        matches = discover_formula_matches(
+            "The HOMO-LUMO gap was calculated using DOS methods."
+        )
+        assert matches == [], "Property acronyms must never be mistaken for real formulas"
+
+    def test_real_formulas_with_single_letter_elements_still_work(self):
+        """Confirms the fix doesn't overcorrect - real formulas using
+        only single-letter elements (no lowercase at all) must still be
+        accepted, the exact case a naive 'require lowercase' fix would
+        have broken."""
+        matches = discover_formula_matches("The molecule H2O is essential for life.")
+        assert [m.text for m in matches] == ["H2O"]
+
+    def test_no_formula_in_plain_text_returns_empty(self):
+        matches = discover_formula_matches("This sentence has no chemical formulas.")
+        assert matches == []
 
 
 class TestRealDatabaseBackedTrie:

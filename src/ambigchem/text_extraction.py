@@ -41,12 +41,47 @@ import sqlite3
 from dataclasses import dataclass
 import marisa_trie
 
+from ambigchem.elements import SYMBOL_TO_NAME
+
 
 @dataclass
 class DiscoveredMatch:
     text: str
     start: int
     end: int
+
+
+# Phase 2: formula-shaped tokens (Fe2O3, NaCl, CuSO4). Pattern and
+# validation logic ported from the original ResAIyan extraction
+# pipeline's compound_resolver.py - the exact mechanism that correctly
+# rejects property acronyms like "HOMO"/"LUMO"/"DOS" (syntactically
+# formula-shaped, but "M" isn't a real element) while accepting real
+# formulas like H2O/NaCl that use single-letter elements with no
+# lowercase at all. Reuses elements.py's own SYMBOL_TO_NAME as the
+# canonical element-symbol set, rather than a separately duplicated
+# list - unlike the original version, which needed its own independent
+# set since no shared elements module existed in that project.
+FORMULA_PATTERN = re.compile(r"\b(?:[A-Z][a-z]?\d{0,3}){2,}\b")
+_FORMULA_CHUNK_PATTERN = re.compile(r"[A-Z][a-z]?")
+
+
+def _is_real_formula(candidate: str) -> bool:
+    """Every parsed (capital + optional lowercase) chunk must be a real
+    periodic table symbol."""
+    chunks = _FORMULA_CHUNK_PATTERN.findall(re.sub(r"\d+", "", candidate))
+    return len(chunks) >= 1 and all(c in SYMBOL_TO_NAME for c in chunks)
+
+
+def discover_formula_matches(text: str) -> list[DiscoveredMatch]:
+    """Phase 2: finds real, chemically-valid formula-shaped tokens
+    directly in text, kept as its own independently-tested function per
+    the layered build plan - not yet merged with Phase 1's trie
+    discovery."""
+    matches: list[DiscoveredMatch] = []
+    for m in FORMULA_PATTERN.finditer(text):
+        if _is_real_formula(m.group(0)):
+            matches.append(DiscoveredMatch(m.group(0), m.start(), m.end()))
+    return matches
 
 
 def _normalize(text: str) -> str:
