@@ -43,7 +43,7 @@ from ambigchem.ionic import parse_ionic_name, FIXED_CATIONS, VARIABLE_CATIONS
 @dataclass
 class OrchestratorResult:
     formula: str | None
-    method: str  # "covalent" | "ionic" | "covalent+ionic agree" | "unresolved" | "ambiguous_engines"
+    method: str  # "covalent" | "ionic" | "organic" | "covalent+ionic agree" | "unresolved" | "ambiguous_engines"
     ambiguous: bool = False
     all_candidates: list[str] | None = None
 
@@ -105,11 +105,29 @@ def parse_compound_name(name: str) -> OrchestratorResult:
             return OrchestratorResult(None, "ionic", ambiguous=True, all_candidates=ion.all_candidates)
 
     # Rule 4: no strong, reliable signal - compare both directly.
-    return _combine_results(
+    result = _combine_results(
         cov.formula, ion.formula,
         cov.ambiguous, cov.all_candidates,
         ion.ambiguous, ion.all_candidates,
     )
+
+    # Rule 5, NEW: if neither engine could resolve this at all (genuinely
+    # unresolved, not ambiguous - covalent.py and ionic.py both require
+    # specific 2-word patterns and simply don't apply to most organic
+    # names), try organic.py as a further, optional fallback. Wrapped in
+    # try/except since organic.py's real dependencies (py2opsin, rdkit)
+    # are an optional extra - if not installed, this stays unresolved
+    # rather than crashing the whole orchestrator.
+    if result.method == "unresolved":
+        try:
+            from ambigchem.organic import parse_organic_name
+            org = parse_organic_name(name)
+            if org.formula:
+                return OrchestratorResult(org.formula, "organic")
+        except ImportError:
+            pass
+
+    return result
 
 
 if __name__ == "__main__":

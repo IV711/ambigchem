@@ -89,3 +89,33 @@ def test_invalid_input_returns_unresolved():
     result = parse_compound_name("not a real compound at all")
     assert result.formula is None
     assert result.method == "unresolved"
+
+
+def test_organic_names_fall_back_correctly():
+    """Neither covalent.py nor ionic.py can even attempt these - both
+    require specific 2-word patterns organic names don't match ('ethanol'
+    is one word; covalent/ionic both immediately return None on non-
+    2-word input). This is the real completion of the orchestrator: all
+    three engines now genuinely reachable from one entry point."""
+    result = parse_compound_name("ethanol")
+    assert result.formula == "C2H6O"
+    assert result.method == "organic"
+
+    result2 = parse_compound_name("acetic acid")
+    assert result2.formula == "C2H4O2"
+    assert result2.method == "organic"
+
+    result3 = parse_compound_name("2,3-dimethylbutane")
+    assert result3.formula == "C6H14"
+    assert result3.method == "organic"
+
+
+def test_covalent_and_ionic_still_take_priority_over_organic():
+    """The organic fallback only fires when covalent AND ionic both
+    genuinely fail - confirms existing routing is unaffected by adding
+    the new fallback."""
+    result = parse_compound_name("dinitrogen pentoxide")
+    assert result.method == "covalent"
+
+    result2 = parse_compound_name("aluminum oxide")
+    assert result2.method == "ionic"
