@@ -312,6 +312,37 @@ class TestExtractAllFourPhasesCombined:
         results = extract_all(text, combined_test_trie)
         ethanol_match = next(r for r in results if r.text == "ethanol")
         assert text[ethanol_match.start:ethanol_match.end] == "ethanol"
+
+    def test_database_matches_get_real_formula_when_db_path_given(self, combined_test_trie):
+        """The actual gap this fixes: found by reviewing extract_all()
+        after it was first built - build_trie_from_database() only pulls
+        NAMES into the trie, never formulas, so a database match would
+        otherwise always have formula=None. This test proves the real
+        fix works, using a real database, not the bare trie fixture."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "compounds.db")
+            create_database(db_path)
+            insert_records(db_path, [
+                DatabaseRecord("aspirin", "C9H8O4", "CC(=O)OC1=CC=CC=C1C(=O)O", "pubchem"),
+            ])
+            trie = marisa_trie.Trie(["aspirin"])
+
+            results = extract_all("We tested aspirin today.", trie, db_path=db_path)
+            aspirin_result = next(r for r in results if r.text == "aspirin")
+            assert aspirin_result.method == "database"
+            assert aspirin_result.formula == "C9H8O4", (
+                "The real gap this test protects: a database match must "
+                "carry its real formula when db_path is provided, not None"
+            )
+
+    def test_database_matches_degrade_gracefully_without_db_path(self, combined_test_trie):
+        """Without db_path, formula=None for database matches - a real,
+        honest degradation, not a crash. Confirms backward compatibility
+        with the original, simpler call signature."""
+        results = extract_all("We tested aspirin today.", combined_test_trie)
+        aspirin_result = next(r for r in results if r.text == "aspirin")
+        assert aspirin_result.method == "database"
+        assert aspirin_result.formula is None
     """Proves build_trie_from_database() genuinely works against a real
     local_database.py instance, not just a hand-built trie - the actual
     real-world path this module is meant to run."""

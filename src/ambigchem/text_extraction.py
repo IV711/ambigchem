@@ -43,6 +43,7 @@ from typing import Protocol
 import marisa_trie
 
 from ambigchem.elements import SYMBOL_TO_NAME
+from ambigchem.local_database import lookup as db_lookup
 
 
 @dataclass
@@ -294,7 +295,7 @@ class ExtractedCompound:
     formula: str | None = None  # populated for "formula" and "opsin_validated"
 
 
-def extract_all(text: str, trie: marisa_trie.Trie) -> list[ExtractedCompound]:
+def extract_all(text: str, trie: marisa_trie.Trie, db_path: str | None = None) -> list[ExtractedCompound]:
     """The unified entry point, combining all four independently-proven
     phases - built only now that each stands on its own real evidence,
     per the original, explicit design intent: 'I would not immediately
@@ -307,6 +308,19 @@ def extract_all(text: str, trie: marisa_trie.Trie) -> list[ExtractedCompound]:
     them - the unvalidated, low-confidence candidates never reach this
     final list at all.
 
+    `db_path`, optional: a real gap found by reviewing this function
+    after it was first built - build_trie_from_database() only pulls
+    compound NAMES into the trie, never formulas, so a database match
+    would otherwise always have formula=None even though the real
+    formula sits one lookup away. If given, each database match gets
+    its real formula via local_database.lookup() directly - the same,
+    already-proven function, not reimplemented. Deliberately a real
+    SQLite lookup per match, NOT marisa_trie.RecordTrie - confirmed via
+    direct testing that RecordTrie requires FIXED-SIZE byte records,
+    meaning any formula longer than a chosen size would be silently
+    corrupted, not error out. A real lookup() call is slightly slower
+    but never silently wrong.
+
     Cross-phase spatial overlaps (e.g. a formula-shaped database entry
     found by both Phase 1 and Phase 2) are reconciled using the exact
     same longest-match/non-overlapping policy already proven for Phase
@@ -315,7 +329,12 @@ def extract_all(text: str, trie: marisa_trie.Trie) -> list[ExtractedCompound]:
     combined: list[ExtractedCompound] = []
 
     for m in extract_compounds_from_text(text, trie):
-        combined.append(ExtractedCompound(m.text, m.start, m.end, "database"))
+        formula = None
+        if db_path:
+            record = db_lookup(db_path, m.text)
+            if record:
+                formula = record.formula
+        combined.append(ExtractedCompound(m.text, m.start, m.end, "database", formula=formula))
 
     for m in discover_formula_matches(text):
         combined.append(ExtractedCompound(m.text, m.start, m.end, "formula"))
