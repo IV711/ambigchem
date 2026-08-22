@@ -25,6 +25,7 @@ from ambigchem.text_extraction import (
     discover_suffix_candidates,
     validate_suffix_candidates,
     extract_all,
+    extract_property_concepts_from_text,
     DiscoveredMatch,
     SuffixCandidate,
     ValidatedSuffixMatch,
@@ -244,6 +245,47 @@ class TestPhase4OpsinValidation:
 
     def test_no_candidates_returns_empty_validated_list(self):
         assert validate_suffix_candidates([]) == []
+
+
+class TestPropertyConceptExtraction:
+    """Reuses discover_all_matches()/select_longest_non_overlapping()
+    completely unchanged for a different vocabulary - proving the
+    generic design actually pays off, not just claiming it would."""
+
+    def test_single_property_concept_found_with_real_position(self):
+        text = "We measured the band gap of the material."
+        matches = extract_property_concepts_from_text(text)
+        assert len(matches) == 1
+        m = matches[0]
+        assert m.text == "band gap"
+        normalized = text.lower()
+        assert normalized[m.start:m.end] == "band gap"
+
+    def test_multiple_property_concepts_in_one_sentence(self):
+        text = "We measured both the band gap and the dipole moment."
+        matches = extract_property_concepts_from_text(text)
+        assert [m.text for m in matches] == ["band gap", "dipole moment"]
+
+    def test_no_property_concepts_returns_empty(self):
+        matches = extract_property_concepts_from_text("The cat sat on the mat.")
+        assert matches == []
+
+    def test_real_apostrophe_in_possessive_term_now_handled_correctly(self):
+        """The real fix to _normalize() this feature required: 'Young's
+        modulus', with a genuine apostrophe exactly as people actually
+        write it, must correctly match - confirmed the OLD behavior
+        (replace apostrophe with a space) would have broken this by
+        splitting it into three words instead of two."""
+        matches = extract_property_concepts_from_text("Young's modulus was calculated.")
+        assert len(matches) == 1
+        assert matches[0].text == "youngs modulus"
+
+    def test_apostrophe_normalization_does_not_break_existing_compound_matching(self, sample_trie):
+        """Direct regression check on the exact existing test this
+        normalization change could plausibly have affected - confirms
+        zero regression, not just assumed from reading the code."""
+        matches = extract_compounds_from_text("Is this water? Yes, it's water.", sample_trie)
+        assert [m.text for m in matches] == ["water", "water"]
 
 
 class TestExtractAllFourPhasesCombined:

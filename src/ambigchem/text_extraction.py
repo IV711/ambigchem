@@ -209,8 +209,13 @@ def validate_suffix_candidates(candidates: list[SuffixCandidate]) -> list[Valida
 
 def _normalize(text: str) -> str:
     """Case normalization, hyphens treated as word boundaries (same as
-    spaces), punctuation stripped while word boundaries are preserved."""
+    spaces), apostrophes STRIPPED ENTIRELY (not replaced with a space) -
+    found necessary specifically for real terms like "Young's modulus":
+    replacing with a space would turn it into three words ("young s
+    modulus"), never matching a two-word vocabulary entry. Other
+    punctuation is stripped while word boundaries are preserved."""
     normalized = text.lower().replace("-", " ")
+    normalized = normalized.replace("'", "")
     normalized = re.sub(r"[^a-z0-9\s]", " ", normalized)
     normalized = re.sub(r"\s+", " ", normalized).strip()
     return normalized
@@ -344,3 +349,54 @@ def extract_all(text: str, trie: marisa_trie.Trie, db_path: str | None = None) -
         combined.append(ExtractedCompound(v.text, v.start, v.end, "opsin_validated", formula=v.formula))
 
     return select_longest_non_overlapping(combined)
+
+
+# Real, curated chemistry property concept vocabulary - deliberately
+# generic, independent of any specific tool's task/API naming (e.g.
+# "band gap" here, never "HOMOLUMOGapTask" - that project-specific
+# concept-to-task-class mapping belongs in ResAIyan, per the same
+# reasoning that originally kept property-to-task mapping out of this
+# library entirely). Deliberately apostrophe-free (e.g. "youngs
+# modulus" not "Young's modulus") - _normalize() strips punctuation to
+# spaces, and an apostrophe-containing trie entry would silently never
+# match the normalized search text otherwise. A real edge case caught
+# before it became a real bug, not after.
+PROPERTY_CONCEPTS = {
+    "band gap", "dipole moment", "melting point", "boiling point",
+    "density", "molar mass", "ionization energy", "electronegativity",
+    "cohesive energy", "atomization energy", "lattice constant",
+    "vapor pressure", "thermal conductivity", "refractive index",
+    "solubility", "electron affinity", "bond length", "bond angle",
+    "oxidation state", "spin state", "specific heat", "enthalpy",
+    "formation energy", "adsorption energy", "surface energy",
+    "youngs modulus", "bulk modulus", "shear modulus", "hardness",
+    "thermal expansion", "heat capacity", "magnetic moment",
+    "work function", "electron mobility", "carrier concentration",
+}
+
+
+def build_property_trie() -> marisa_trie.Trie:
+    """A real, small trie built from the fixed property vocabulary -
+    reuses the exact same generic discovery/selection machinery already
+    proven for compound-name matching, with zero code changes needed for
+    a completely different vocabulary."""
+    return marisa_trie.Trie(PROPERTY_CONCEPTS)
+
+
+def extract_property_concepts_from_text(text: str) -> list[DiscoveredMatch]:
+    """Extracts real, generic chemistry property concepts from text,
+    WITH real position data - essential for a caller (e.g. ResAIyan) to
+    reason about proximity between a property mention and a compound
+    mention, per the already-agreed design: this library returns raw
+    material only, it never decides which compound a property refers to
+    (see e.g. 'compare the band gaps of X and Y' - a case where
+    proximity alone would be the wrong signal, decided outside this
+    library entirely).
+
+    Deliberately reuses discover_all_matches()/select_longest_non_
+    overlapping() unchanged - the same longest-match, overlap-safe
+    machinery already proven for compound names works identically here,
+    since both are the same underlying problem: known vocabulary, found
+    in text, with real positions attached."""
+    trie = build_property_trie()
+    return select_longest_non_overlapping(discover_all_matches(text, trie))
