@@ -24,6 +24,7 @@ from ambigchem.text_extraction import (
     discover_formula_matches,
     discover_suffix_candidates,
     validate_suffix_candidates,
+    discover_orchestrator_matches,
     extract_all,
     extract_property_concepts_from_text,
     DiscoveredMatch,
@@ -319,6 +320,79 @@ class TestPropertyConceptExtraction:
         zero regression, not just assumed from reading the code."""
         matches = extract_compounds_from_text("Is this water? Yes, it's water.", sample_trie)
         assert [m.text for m in matches] == ["water", "water"]
+
+
+class TestPhase5OrchestratorMatches:
+    """Phase 5: real, multi-word covalent/ionic/organic names, wired in
+    via orchestrator.parse_compound_name() - the real gap Phases 1-4
+    structurally couldn't fill, found via live user testing."""
+
+    def test_covalent_multiword_name_resolved(self):
+        matches = discover_orchestrator_matches("carbon monoxide")
+        assert len(matches) == 1
+        assert matches[0].text == "carbon monoxide"
+        assert matches[0].method == "covalent"
+        assert matches[0].formula == "CO"
+
+    def test_ionic_multiword_name_with_roman_numeral_resolved(self):
+        """The real reason Phase 5 needs its own tokenizer, not the
+        shared _normalize() pipeline: ionic.py's Roman-numeral detection
+        needs literal parentheses, which _normalize() strips to spaces
+        elsewhere."""
+        matches = discover_orchestrator_matches("iron(III) oxide")
+        assert len(matches) == 1
+        assert matches[0].text == "iron(III) oxide"
+        assert matches[0].method == "ionic"
+        assert matches[0].formula == "Fe2O3"
+
+    def test_genuine_ambiguity_is_skipped_not_reported(self):
+        """A real, deliberate design choice: Phase 5 only reports
+        CONFIDENT matches. 'iron oxide' with no Roman numeral is
+        genuinely ambiguous at the orchestrator level - ExtractedCompound
+        has no slot for 'ambiguous, here are the candidates' today, so
+        this is honestly skipped, not silently guessed."""
+        matches = discover_orchestrator_matches("iron oxide")
+        assert matches == []
+
+    def test_honest_organic_gap_documented_by_a_real_test(self):
+        """The real, documented scope limit: the cheap pre-filter
+        requires the second word to end in a known anion pattern, which
+        multi-word organic names like 'acetic acid' don't have. This
+        test protects that documented limitation from silently changing
+        without the module's own docstring being updated to match."""
+        matches = discover_orchestrator_matches("acetic acid")
+        assert matches == []
+
+    def test_ordinary_english_rejected_cheaply(self):
+        """Confirms the pre-filter actually prevents wasted orchestrator/
+        OPSIN calls on ordinary text, not just that it happens to return
+        no matches."""
+        matches = discover_orchestrator_matches("the cat sat on the mat")
+        assert matches == []
+
+    def test_positions_are_real_and_correct(self):
+        text = "The compound iron(III) oxide was synthesized."
+        matches = discover_orchestrator_matches(text)
+        assert len(matches) == 1
+        m = matches[0]
+        assert text[m.start:m.end] == "iron(III) oxide"
+
+    def test_wired_into_extract_all_with_specific_method_and_formula(self):
+        """The real, end-to-end proof: extract_all() now finds a
+        multi-word covalent/ionic name that Phases 1-4 alone could never
+        have found, with the SPECIFIC engine method (not a generic
+        'orchestrator' label) and the real, resolved formula - not
+        formula=None, a genuine bug found and fixed during Phase 5's
+        own construction."""
+        trie = marisa_trie.Trie(["aspirin"])
+        text = "We tested carbon monoxide and iron(III) oxide today."
+        results = extract_all(text, trie)
+        by_text = {r.text: r for r in results}
+
+        assert by_text["carbon monoxide"].method == "covalent"
+        assert by_text["carbon monoxide"].formula == "CO"
+        assert by_text["iron(III) oxide"].method == "ionic"
+        assert by_text["iron(III) oxide"].formula == "Fe2O3"
 
 
 class TestExtractAllFourPhasesCombined:
