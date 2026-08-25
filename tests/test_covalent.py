@@ -50,6 +50,27 @@ def test_unverified_prefixes_deliberately_not_elided():
     assert parse_covalent_name("tetraphosphorus decaoxide").formula == "P4O10"
 
 
+def test_spelling_variants_work_correctly():
+    """Real bug found via live user testing: covalent.py maintained its
+    own, separate element lookup that had silently diverged from
+    elements.py's own name_to_symbol() - 'sulphur hexafluoride' failed
+    while the canonical 'sulfur hexafluoride' succeeded, even though
+    elements.py itself has always correctly recognized 'sulphur' as a
+    real spelling variant."""
+    assert parse_covalent_name("sulphur hexafluoride").formula == "SF6"
+    assert parse_covalent_name("sulfur hexafluoride").formula == "SF6"
+
+
+def test_same_element_on_both_sides_rejected():
+    """Real bug found via live user testing: 'trinitrogen nitride' was
+    producing the nonsensical formula 'N3N' (the same element symbol
+    appearing twice, never how a real formula is written). A binary
+    covalent name genuinely needs two DIFFERENT elements - this is
+    rejected outright, not silently combined into something equally
+    wrong like 'N4'."""
+    assert parse_covalent_name("trinitrogen nitride").formula is None
+
+
 def test_invalid_input_returns_none():
     assert parse_covalent_name("not a real compound name").formula is None
     assert parse_covalent_name("just one word").formula is None

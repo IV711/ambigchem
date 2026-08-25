@@ -44,3 +44,13 @@ def test_unknown_symbol_returns_none():
 
 def test_unknown_name_returns_none():
     assert name_to_symbol("unobtainium") is None
+
+
+def test_spelling_variants_is_public_and_reusable():
+    """Real bug fix: this dict was previously private (_SPELLING_VARIANTS),
+    which let covalent.py silently maintain its own, incomplete copy.
+    Made public specifically so other modules can properly reuse the
+    real, single source of truth instead of duplicating it."""
+    from ambigchem.elements import SPELLING_VARIANTS
+    assert SPELLING_VARIANTS.get("sulphur") == "S"
+    assert SPELLING_VARIANTS.get("aluminum") == "Al"

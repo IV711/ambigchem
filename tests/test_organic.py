@@ -45,3 +45,15 @@ def test_inorganic_names_are_correctly_out_of_scope():
 def test_invalid_input_returns_none():
     result = parse_organic_name("not a real chemical name at all xyz123")
     assert result.formula is None
+
+
+def test_charged_species_correctly_rejected():
+    """Real bug found via live user testing: 'cuprous oxide' (a real,
+    neutral compound, Cu2O) was resolved by OPSIN as the charged species
+    [Cu-]=O (net formal charge -1), producing the confusing formula
+    'CuO-'. Confirmed as a genuine OPSIN interpretation quirk, not
+    something introduced by this wrapper - rather than present a
+    misleading charged formula as if it answered a neutral-compound
+    question, this must be rejected outright."""
+    result = parse_organic_name("cuprous oxide")
+    assert result.formula is None

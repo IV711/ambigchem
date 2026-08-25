@@ -86,6 +86,16 @@ def test_titanium_oxide_is_a_new_real_ambiguity_case():
     assert set(result.all_candidates) == {"Ti2O3", "TiO2"}
 
 
+def test_dichromate_and_permanganate():
+    """Real gap found via live user testing: 'potassium dichromate' and
+    'potassium permanganate' both correctly formula-computed via the
+    organic/OPSIN path (a valid answer, but via an unexpected mechanism
+    and misleading method label for real ionic compounds) - now
+    resolved correctly and directly via ionic.py instead."""
+    assert parse_ionic_name("potassium dichromate").formula == "K2Cr2O7"
+    assert parse_ionic_name("potassium permanganate").formula == "KMnO4"
+
+
 def test_invalid_input_returns_none():
     assert parse_ionic_name("not a real compound").formula is None
     assert parse_ionic_name("justoneword").formula is None
