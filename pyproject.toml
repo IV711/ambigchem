@@ -9,7 +9,7 @@ description = "A disambiguation-first chemistry name and formula resolution libr
 readme = "README.md"
 license = {text = "MIT"}
 authors = [
-    {name = "Madumitha", email = "madumithaot7@gmail.com"}
+    {name = "Madumitha I V", email = "madumithaot7@gmail.com"}
 ]
 requires-python = ">=3.9"
 dependencies = ["ase>=3.22", "marisa-trie>=1.0"]
@@ -18,6 +18,9 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
+
+[project.scripts]
+ambigchem = "ambigchem.cli:main"
 
 [project.optional-dependencies]
 test = ["pytest>=7.0"]

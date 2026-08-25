@@ -74,10 +74,11 @@ FIXED_CATIONS: dict[str, tuple[str, int, bool]] = {
 # chromium, cobalt, manganese, nickel added after finding real, explicit
 # Roman-numeral usage (e.g. "chromium(II) iodide", "chromium(III)
 # iodide", "cobalt(III) iodide", "manganese(II) iodide") across extensive
-# real sources. Deliberately conservative: only the states directly
-# confirmed in real usage are included (e.g. manganese's real +4/+7
-# states, tied to specific oxide/oxyanion contexts like MnO2/permanganate
-# rather than typical simple binary salts, are left out).
+# real sources. manganese(IV) (MnO2) added after direct confirmation:
+# real sources call it "the most important manganese(IV) compound" and
+# list +2/+4/+6/+7 as manganese's real "principal oxidation states" - the
+# earlier exclusion of +4 was itself too conservative, found and fixed
+# after live testing surfaced the gap directly.
 VARIABLE_CATIONS: dict[str, tuple[str, list[int]]] = {
     "iron": ("Fe", [2, 3]),
     "copper": ("Cu", [1, 2]),
@@ -86,8 +87,26 @@ VARIABLE_CATIONS: dict[str, tuple[str, list[int]]] = {
     "titanium": ("Ti", [3, 4]),
     "chromium": ("Cr", [2, 3]),
     "cobalt": ("Co", [2, 3]),
-    "manganese": ("Mn", [2, 3]),
+    "manganese": ("Mn", [2, 3, 4]),
     "nickel": ("Ni", [2, 3]),
+}
+
+# Mercury: a genuine, real SPECIAL case, kept separate from
+# VARIABLE_CATIONS above rather than forced into its (symbol, [charges])
+# shape. Confirmed directly: mercury(I)'s real compound is the DIMERIC
+# ion Hg2^2+ ("Hg2Cl2 (Mercury(I) chloride)" - a real, distinctly named
+# compound, "calomel") - NOT two independent Hg+ ions. Mercury is the
+# only cation in this file needing a charge-dependent SYMBOL (Hg2 vs Hg),
+# not just a charge-dependent count, so it gets its own small, contained
+# lookup rather than a broader, riskier refactor of the general case.
+#
+# Keyed by the conventional Roman-numeral label (I, II - the oxidation
+# state PER ATOM), mapping to (symbol, REAL TOTAL unit charge, is_poly):
+# mercury(I)'s "I" means +1 per atom, but the real ionic UNIT that
+# balances against an anion carries a total charge of +2 (the pair).
+_MERCURY_CANDIDATES: dict[int, tuple[str, int, bool]] = {
+    1: ("Hg2", 2, True),   # mercury(I): the real, dimeric Hg2^2+ ion
+    2: ("Hg", 2, False),    # mercury(II): the ordinary, simple Hg2+ ion
 }
 
 # Real, looked-up polyatomic anions - charge is not derivable from any
@@ -139,6 +158,16 @@ def _parse_cation(text: str) -> list[tuple[str, int, bool]]:
     if roman_match:
         explicit_charge = ROMAN_TO_INT.get(roman_match.group(1).upper())
         text = text[:roman_match.start()].strip()
+
+    if text == "mercury":
+        if explicit_charge is not None:
+            if explicit_charge in _MERCURY_CANDIDATES:
+                symbol, real_charge, is_poly = _MERCURY_CANDIDATES[explicit_charge]
+                return [(symbol, real_charge, is_poly)]
+            return []  # explicitly specified a charge mercury doesn't really have
+        # No Roman numeral - genuine, real ambiguity between two real,
+        # distinctly-named compounds (calomel vs corrosive sublimate).
+        return [(symbol, charge, is_poly) for symbol, charge, is_poly in _MERCURY_CANDIDATES.values()]
 
     if text in FIXED_CATIONS:
         symbol, charge, is_poly = FIXED_CATIONS[text]

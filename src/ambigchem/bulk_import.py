@@ -35,6 +35,54 @@ from __future__ import annotations
 from rdkit import Chem
 from ambigchem.local_database import DatabaseRecord, insert_records
 
+# REAL, SERIOUS DATA-QUALITY ISSUE, found via live user testing, not
+# anticipated in advance: a real, unfiltered PubChem import genuinely
+# includes very short "names" - e.g. bare element symbols like "W"
+# (tungsten) or "Es" (einsteinium) imported as real, standalone synonym
+# entries. Once in the trie, these coincidentally match as SUBSTRINGS
+# inside completely unrelated English words - "w" was found inside "We",
+# "es" was found inside "tested" - producing nonsense results in real,
+# full-sentence extraction. The matching algorithm itself is correct: it
+# faithfully finds real, registered database entries. The bug is in the
+# DATA - these entries should never have been imported as freely
+# searchable "names" without a quality filter. Fixed here, at import
+# time, plus a real cleanup utility in local_database.py for anyone
+# whose database was already built before this fix existed.
+MIN_NAME_LENGTH = 3
+
+# A real, honest STARTER list of the most common, highest-frequency
+# English words most likely to coincidentally appear as PubChem synonyms
+# somewhere in a database this large - NOT an exhaustive general English
+# stopword list (that would be a much bigger undertaking), same honest
+# framing as every other starter list in this project. Catches specific,
+# real false positives found via live testing ("and", "the", "result",
+# "please", "indicate", "tested" all genuinely appeared as spurious
+# matches in real user testing).
+COMMON_ENGLISH_WORDS = {
+    "the", "and", "for", "was", "with", "this", "that", "from", "have",
+    "please", "indicate", "result", "results", "tested", "using", "were",
+    "are", "not", "but", "all", "can", "has", "had", "will", "would",
+    "could", "should", "been", "being", "into", "than", "then", "them",
+    "they", "their", "there", "these", "those", "what", "when", "where",
+    "which", "while", "about", "also", "such", "some", "each", "more",
+}
+
+
+def is_trustworthy_name(name: str) -> bool:
+    """A real, honest quality filter for names being imported as
+    searchable compound entries - rejects names too short to plausibly
+    be an intentional, real chemical name mention (bare element symbols
+    like 'W' or 'Es'), and rejects a real, curated starter list of
+    common English words most likely to cause false positives. Exposed
+    publicly so it can also be reused for retroactively cleaning an
+    already-built database (see local_database.remove_low_quality_names)."""
+    stripped = name.strip()
+    if len(stripped) < MIN_NAME_LENGTH:
+        return False
+    if stripped.lower() in COMMON_ENGLISH_WORDS:
+        return False
+    return True
+
 # Different real sources use different property tag NAMES for the same
 # real information - this maps each source's own tags to our unified
 # schema. See module docstring for which of these are independently
@@ -136,6 +184,8 @@ def import_sdf(sdf_path: str, db_path: str, source: str, synonym_path: str | Non
         if cid and cid in synonym_map:
             all_names.update(synonym_map[cid])
         for name in all_names:
+            if not is_trustworthy_name(name):
+                continue  # real, live-tested fix: reject short/common-word noise
             records.append(DatabaseRecord(name=name, formula=formula, smiles=smiles, source=source))
 
     return insert_records(db_path, records)

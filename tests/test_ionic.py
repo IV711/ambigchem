@@ -89,3 +89,33 @@ def test_titanium_oxide_is_a_new_real_ambiguity_case():
 def test_invalid_input_returns_none():
     assert parse_ionic_name("not a real compound").formula is None
     assert parse_ionic_name("justoneword").formula is None
+
+
+def test_manganese_oxide_shows_all_three_real_candidates():
+    """Real bug found via live user testing: manganese's +4 state
+    (MnO2, confirmed 'the most important manganese(IV) compound') was
+    too conservatively excluded - manganese oxide's ambiguity must
+    surface all three real candidates, not just two."""
+    result = parse_ionic_name("manganese oxide")
+    assert result.ambiguous is True
+    assert set(result.all_candidates) == {"MnO", "Mn2O3", "MnO2"}
+
+
+def test_manganese_iv_oxide_resolves():
+    assert parse_ionic_name("manganese(IV) oxide").formula == "MnO2"
+
+
+def test_mercury_chloride_genuine_ambiguity():
+    """Real bug found via live user testing: mercury wasn't in the
+    cation data at all. Mercury(I)'s real compound is the DIMERIC Hg2^2+
+    ion (Hg2Cl2, 'calomel'), genuinely different from mercury(II)'s
+    simple HgCl2 ('corrosive sublimate') - both real, distinctly named
+    compounds, correctly surfaced as genuine ambiguity."""
+    result = parse_ionic_name("mercury chloride")
+    assert result.ambiguous is True
+    assert set(result.all_candidates) == {"Hg2Cl2", "HgCl2"}
+
+
+def test_mercury_roman_numerals_resolve_correctly():
+    assert parse_ionic_name("mercury(I) chloride").formula == "Hg2Cl2"
+    assert parse_ionic_name("mercury(II) chloride").formula == "HgCl2"

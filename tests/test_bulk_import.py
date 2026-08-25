@@ -14,7 +14,7 @@ import tempfile
 import pytest
 from rdkit import Chem
 from ambigchem.local_database import create_database, lookup, count_records
-from ambigchem.bulk_import import import_sdf
+from ambigchem.bulk_import import import_sdf, is_trustworthy_name
 
 
 @pytest.fixture
@@ -107,6 +107,18 @@ def test_offline_lookup_after_import_needs_zero_network(sample_sdf_and_db):
     result = lookup(db_path, "aspirin")
     assert result is not None
     assert result.source == "pubchem"
+
+
+def test_is_trustworthy_name_rejects_short_and_common_words():
+    """Real bug found via live user testing: a real, unfiltered PubChem
+    import genuinely includes bare element symbols ('W', 'Es') that
+    coincidentally match inside ordinary English words during full-
+    sentence extraction."""
+    assert is_trustworthy_name("W") is False
+    assert is_trustworthy_name("Es") is False
+    assert is_trustworthy_name("the") is False
+    assert is_trustworthy_name("aspirin") is True
+    assert is_trustworthy_name("NaCl") is True
 
 
 def test_synonym_file_closes_the_real_confirmed_gap(real_world_sample_with_synonym_gap):

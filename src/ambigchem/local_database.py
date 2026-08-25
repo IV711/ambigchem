@@ -41,13 +41,18 @@ def create_database(db_path: str) -> None:
     conn.close()
 
 
-def insert_records(db_path: str, records: list[DatabaseRecord]) -> int:
+def insert_records(db_path: str, records: list[DatabaseRecord], batch_size: int = 1000) -> int:
     """Real, bulk insert - names are stored lowercase for case-
     insensitive lookup, matching every other module's convention in
-    this library. Returns count of records actually inserted."""
+    this library. Commits periodically (every `batch_size` records)
+    rather than only once at the end - found necessary once a real,
+    large-scale import (up to 500,000 PubChem entries) was actually
+    attempted: a single final commit means an interrupted large import
+    loses ALL progress, not just the remainder. Returns count of
+    records actually inserted."""
     conn = sqlite3.connect(db_path)
     count = 0
-    for r in records:
+    for i, r in enumerate(records):
         try:
             conn.execute(
                 "INSERT OR REPLACE INTO compounds (name, formula, smiles, source) VALUES (?, ?, ?, ?)",
@@ -56,7 +61,9 @@ def insert_records(db_path: str, records: list[DatabaseRecord]) -> int:
             count += 1
         except sqlite3.Error:
             continue  # a single bad record must not abort the whole import
-    conn.commit()
+        if (i + 1) % batch_size == 0:
+            conn.commit()
+    conn.commit()  # final commit for any remaining records
     conn.close()
     return count
 
@@ -73,6 +80,33 @@ def lookup(db_path: str, name: str) -> DatabaseRecord | None:
     if row is None:
         return None
     return DatabaseRecord(name=row[0], formula=row[1], smiles=row[2], source=row[3])
+
+
+def remove_low_quality_names(db_path: str, batch_size: int = 1000) -> int:
+    """Retroactively purges short/common-word entries from an ALREADY-
+    BUILT database - for anyone whose database was imported before
+    bulk_import.py's is_trustworthy_name() filter existed. Reuses that
+    exact same filter, so a fresh import and a cleaned-up old one apply
+    the identical, real quality bar. Found necessary via live user
+    testing: real, unfiltered PubChem imports genuinely include bare
+    element symbols and other short noise that coincidentally matches
+    inside ordinary English words during full-sentence extraction.
+    Returns the count of rows removed."""
+    from ambigchem.bulk_import import is_trustworthy_name
+
+    conn = sqlite3.connect(db_path)
+    all_names = [row[0] for row in conn.execute("SELECT name FROM compounds")]
+
+    to_remove = [name for name in all_names if not is_trustworthy_name(name)]
+    removed = 0
+    for i, name in enumerate(to_remove):
+        conn.execute("DELETE FROM compounds WHERE name = ?", (name,))
+        removed += 1
+        if (i + 1) % batch_size == 0:
+            conn.commit()
+    conn.commit()
+    conn.close()
+    return removed
 
 
 def count_records(db_path: str) -> int:

@@ -8,7 +8,7 @@ testable locally, zero network dependency at any point.
 import os
 import tempfile
 import pytest
-from ambigchem.local_database import create_database, insert_records, lookup, count_records, DatabaseRecord
+from ambigchem.local_database import create_database, insert_records, lookup, count_records, remove_low_quality_names, DatabaseRecord
 
 
 @pytest.fixture
@@ -68,3 +68,35 @@ def test_insert_or_replace_does_not_duplicate(db_path):
     insert_records(db_path, [DatabaseRecord("water", "H2O", "[OH2]", "pubchem")])  # different SMILES, same name
     assert count_records(db_path) == 1
     assert lookup(db_path, "water").smiles == "[OH2]"
+
+
+class TestRemoveLowQualityNames:
+    """Real bug found via live user testing: a real, unfiltered PubChem
+    import genuinely includes bare element symbols and other short noise
+    (e.g. 'W' for tungsten) that coincidentally matches inside ordinary
+    English words during full-sentence extraction ('w' found inside
+    'We', 'es' found inside 'tested'). This retroactively cleans an
+    already-built database - for anyone whose data predates
+    bulk_import.py's is_trustworthy_name() filter."""
+
+    def test_short_and_common_names_removed_real_compounds_kept(self, db_path):
+        insert_records(db_path, [
+            DatabaseRecord("W", "W", None, "pubchem"),
+            DatabaseRecord("Es", "Es", None, "pubchem"),
+            DatabaseRecord("the", "C1", None, "pubchem"),
+            DatabaseRecord("aspirin", "C9H8O4", None, "pubchem"),
+            DatabaseRecord("titanium dioxide", "TiO2", None, "pubchem"),
+        ])
+        removed = remove_low_quality_names(db_path)
+        assert removed == 3
+        assert lookup(db_path, "W") is None
+        assert lookup(db_path, "Es") is None
+        assert lookup(db_path, "the") is None
+        assert lookup(db_path, "aspirin") is not None
+        assert lookup(db_path, "aspirin").formula == "C9H8O4"
+        assert lookup(db_path, "titanium dioxide") is not None
+
+    def test_clean_database_removes_nothing(self, db_path):
+        insert_records(db_path, [DatabaseRecord("aspirin", "C9H8O4", None, "pubchem")])
+        assert remove_low_quality_names(db_path) == 0
+        assert count_records(db_path) == 1
