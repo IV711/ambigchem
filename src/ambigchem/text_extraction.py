@@ -247,12 +247,29 @@ def load_or_build_trie(db_path: str, trie_cache_path: str | None = None) -> mari
 
 def discover_all_matches(text: str, trie: marisa_trie.Trie) -> list[DiscoveredMatch]:
     """DISCOVERY: every database entry that occurs anywhere in the text,
-    at every starting position - including shorter matches even when a
-    longer match also exists at the same position (e.g. both 'iron' and
-    'iron oxide' from the same starting point). Never decides which to
-    prefer - that is SELECTION's job, kept deliberately separate so a
-    caller wanting the full candidate set (not just the default
-    selection) always has access to it."""
+    at every genuine word-boundary-aligned starting position - including
+    shorter matches even when a longer match also exists at the same
+    position (e.g. both 'iron' and 'iron oxide' from the same starting
+    point). Never decides which to prefer - that is SELECTION's job,
+    kept deliberately separate so a caller wanting the full candidate
+    set (not just the default selection) always has access to it.
+
+    TWO REAL WORD-BOUNDARY CONSTRAINTS, added after live user testing
+    found the original version accepted matches with no such
+    constraints at all - a real, more fundamental bug than a length or
+    stopword filter alone could fix (a length filter can't distinguish
+    "urea", a real 4-character compound name, from "indi", 4-character
+    noise - the actual problem is that "indi" was never a real word to
+    begin with):
+      1. START boundary - a match may only be attempted at position 0,
+         or immediately after a space. Without this, "ted" was found
+         starting mid-word at position 3 of "tested" - never a genuine
+         word start at all.
+      2. END boundary - a match must consume a COMPLETE token, ending
+         at a space or the end of the text, never leaving characters
+         dangling right after it. Without this, "fe2" was accepted as a
+         partial match of the longer token "fe2o3", and "indi" as a
+         partial match of "indicate"."""
     normalized = _normalize(text)
     all_matches: list[DiscoveredMatch] = []
     i = 0
@@ -260,8 +277,13 @@ def discover_all_matches(text: str, trie: marisa_trie.Trie) -> list[DiscoveredMa
         if normalized[i] == " ":
             i += 1
             continue
-        for candidate in trie.prefixes(normalized[i:]):
-            all_matches.append(DiscoveredMatch(candidate, i, i + len(candidate)))
+        is_word_start = (i == 0) or (normalized[i - 1] == " ")
+        if is_word_start:
+            for candidate in trie.prefixes(normalized[i:]):
+                end = i + len(candidate)
+                is_word_end = (end == len(normalized)) or (normalized[end] == " ")
+                if is_word_end:
+                    all_matches.append(DiscoveredMatch(candidate, i, end))
         i += 1
     return all_matches
 
@@ -342,7 +364,12 @@ def extract_all(text: str, trie: marisa_trie.Trie, db_path: str | None = None) -
         combined.append(ExtractedCompound(m.text, m.start, m.end, "database", formula=formula))
 
     for m in discover_formula_matches(text):
-        combined.append(ExtractedCompound(m.text, m.start, m.end, "formula"))
+        # m.text IS itself a validated formula (it passed _is_real_formula()
+        # to be discovered at all) - populating it here, rather than
+        # leaving formula=None, closes a real inconsistency found by
+        # reviewing live output: "NaCl" via method="formula" previously
+        # carried formula=None even though the matched text is the answer.
+        combined.append(ExtractedCompound(m.text, m.start, m.end, "formula", formula=m.text))
 
     validated = validate_suffix_candidates(discover_suffix_candidates(text))
     for v in validated:

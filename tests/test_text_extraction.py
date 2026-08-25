@@ -111,6 +111,39 @@ def test_no_match_returns_empty_list(sample_trie):
     assert matches == []
 
 
+def test_mid_word_matches_correctly_rejected():
+    """Real bug found via live user testing: without a word-boundary
+    constraint, a database entry could match starting in the MIDDLE of
+    an unrelated word - 'ted' was genuinely found starting at position 3
+    of 'tested', which is never a real word start at all."""
+    import marisa_trie
+    trie = marisa_trie.Trie(["ted"])
+    matches = discover_all_matches("We tested this.", trie)
+    assert matches == [], "'ted' must never match mid-word inside 'tested'"
+
+
+def test_partial_token_matches_correctly_rejected():
+    """Real bug found via live user testing: a database entry starting
+    at a genuine word boundary could still match only PART of a longer
+    contiguous token, leaving characters dangling - 'fe2' was genuinely
+    accepted as a partial match of the longer real token 'fe2o3'."""
+    import marisa_trie
+    trie = marisa_trie.Trie(["fe2"])
+    matches = discover_all_matches("The compound Fe2O3 was tested.", trie)
+    assert matches == [], "'fe2' must never partially match inside the longer token 'fe2o3'"
+
+
+def test_legitimate_short_names_still_work_after_boundary_fix():
+    """Confirms the word-boundary fix is genuinely more principled than
+    a blunt length filter: 'urea' (4 real chars) must still resolve
+    correctly, proving the fix distinguishes real, complete words from
+    fragments - not just rejecting everything short."""
+    import marisa_trie
+    trie = marisa_trie.Trie(["urea"])
+    matches = discover_all_matches("We used urea in this reaction.", trie)
+    assert [m.text for m in matches] == ["urea"]
+
+
 class TestPhase2FormulaExtraction:
     """Phase 2, kept deliberately separate per the layered build plan -
     formula-shaped tokens (Fe2O3, NaCl, CuSO4), not database names."""
@@ -310,6 +343,20 @@ class TestExtractAllFourPhasesCombined:
     def test_formula_match_included(self, combined_test_trie):
         results = extract_all("The compound Fe2O3 was analyzed.", combined_test_trie)
         assert any(r.text == "Fe2O3" and r.method == "formula" for r in results)
+
+    def test_formula_matches_carry_their_own_formula(self, combined_test_trie):
+        """A real gap found by reviewing live output: a formula-regex
+        match's text IS itself a validated formula (it passed
+        _is_real_formula() to be discovered at all) - formula=None was
+        an inconsistency, not a meaningful distinction from the other
+        two methods. Uses CuSO4, not NaCl - NaCl is ALSO a database
+        entry in this fixture, which caused the exact same cross-phase
+        conflict as an earlier test in this file (see
+        test_all_four_phases_together_in_one_sentence's own comment)."""
+        results = extract_all("The compound CuSO4 was tested.", combined_test_trie)
+        match = next(r for r in results if r.text == "CuSO4")
+        assert match.method == "formula"
+        assert match.formula == "CuSO4"
 
     def test_opsin_validated_match_included_false_positive_excluded(self, combined_test_trie):
         results = extract_all("Please indicate that ethanol was used.", combined_test_trie)
