@@ -116,6 +116,9 @@ POLYATOMIC_ANIONS: dict[str, tuple[str, int]] = {
     "nitrate": ("NO3", -1), "phosphate": ("PO4", -3),
     "hydroxide": ("OH", -1), "cyanide": ("CN", -1),
     "acetate": ("C2H3O2", -1),
+    # dichromate/permanganate added after live user testing found the
+    # gap - confirmed via search: Cr2O7 (-2), MnO4 (-1).
+    "dichromate": ("Cr2O7", -2), "permanganate": ("MnO4", -1),
 }
 
 # Simple monatomic anion charge, reliable ONLY for these groups

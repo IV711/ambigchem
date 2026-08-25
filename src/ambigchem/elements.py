@@ -48,7 +48,13 @@ ELEMENT_DATA: list[tuple[str, str]] = [
 ]
 
 # Real, legitimate alternate spellings - both map to the same symbol.
-_SPELLING_VARIANTS: dict[str, str] = {
+# Public (not underscore-prefixed) so other modules - covalent.py in
+# particular - can properly reuse this exact data, rather than each
+# maintaining its own, potentially-incomplete copy. Found necessary via
+# real, live user testing: covalent.py's own element lookup had silently
+# diverged from this one, causing "sulphur hexafluoride" to fail while
+# the canonical "sulfur hexafluoride" succeeded.
+SPELLING_VARIANTS: dict[str, str] = {
     "aluminum": "Al",
     "sulphur": "S",
     "cesium": "Cs",
@@ -67,4 +73,4 @@ def name_to_symbol(name: str) -> str | None:
     """Returns the real element symbol for a name (case-insensitive,
     accepts common spelling variants), or None."""
     lowered = name.lower()
-    return _NAME_TO_SYMBOL.get(lowered) or _SPELLING_VARIANTS.get(lowered)
+    return _NAME_TO_SYMBOL.get(lowered) or SPELLING_VARIANTS.get(lowered)

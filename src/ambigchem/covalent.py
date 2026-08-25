@@ -25,7 +25,7 @@ unimplemented rather than guessed at.
 
 from __future__ import annotations
 from dataclasses import dataclass
-from ambigchem.elements import ELEMENT_DATA
+from ambigchem.elements import ELEMENT_DATA, SPELLING_VARIANTS
 
 PREFIXES: dict[str, int] = {
     "mono": 1, "di": 2, "tri": 3, "tetra": 4, "penta": 5,
@@ -118,6 +118,7 @@ def _all_prefix_candidates(word: str, base_lookup: dict[str, str]) -> list[tuple
 
 
 _ELEMENT_LOOKUP: dict[str, str] = {n.lower(): s for s, n in ELEMENT_DATA}
+_ELEMENT_LOOKUP.update(SPELLING_VARIANTS)  # real bug fix: "sulphur" etc. were missing here
 
 
 def parse_covalent_name(name: str) -> CovalentParseResult:
@@ -132,11 +133,25 @@ def parse_covalent_name(name: str) -> CovalentParseResult:
         return CovalentParseResult(None, None, None)
 
     # Combine every (first, second) pairing into a real candidate formula.
+    # Reject any pairing where BOTH sides resolve to the SAME element -
+    # real bug found via live user testing: "trinitrogen nitride" was
+    # producing the nonsensical "N3N" (nitrogen appearing twice in one
+    # formula, never how a real formula is written - even if this
+    # somehow represented a real compound, it should combine to "N4",
+    # not repeat the symbol). More fundamentally, a binary covalent name
+    # genuinely needs two DIFFERENT elements - "X X-ide" isn't a valid
+    # real naming pattern at all, so this is rejected outright rather
+    # than combined.
     results = []
     for c1, s1 in first_candidates:
         for c2, s2 in second_candidates:
+            if s1 == s2:
+                continue
             formula = s1 + (str(c1) if c1 > 1 else "") + s2 + (str(c2) if c2 > 1 else "")
             results.append((formula, c1, c2))
+
+    if not results:
+        return CovalentParseResult(None, None, None)
 
     unique_by_formula = list({r[0]: r for r in results}.values())
 

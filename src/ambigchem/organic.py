@@ -67,6 +67,19 @@ def parse_organic_name(name: str) -> OrganicParseResult:
     if mol is None:
         return OrganicParseResult(None, smiles=smiles)
 
+    # Real bug found via live user testing: "cuprous oxide" (a real,
+    # neutral compound, Cu2O) was resolved by OPSIN as the charged
+    # species [Cu-]=O (net charge -1), producing the confusing formula
+    # "CuO-". This is a genuine OPSIN interpretation quirk for this
+    # specific adjectival-oxidation-state phrasing, outside our control
+    # to fix at the source - confirmed directly: the SMILES OPSIN itself
+    # returned represents a real -1 charge, not something introduced by
+    # this wrapper. Rather than present a misleading charged formula as
+    # if it answered a neutral-compound question (this library's whole
+    # established scope), reject it outright.
+    if Chem.GetFormalCharge(mol) != 0:
+        return OrganicParseResult(None, smiles=smiles)
+
     formula = rdMolDescriptors.CalcMolFormula(mol)
     return OrganicParseResult(formula, smiles=smiles)
 
