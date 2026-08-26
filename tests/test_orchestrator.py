@@ -135,3 +135,42 @@ def test_classical_ous_ic_naming_resolves_via_ionic_through_orchestrator():
     result2 = parse_compound_name("cuprous oxide")
     assert result2.formula == "Cu2O"
     assert result2.method == "ionic"
+
+
+def test_hydrate_wiring_closes_a_real_previously_open_gap():
+    """hydrates.py was a complete, tested module with NO path reaching
+    it from the orchestrator at all - a real, previously-open
+    disconnect, now closed."""
+    result = parse_compound_name("copper(II) sulfate pentahydrate")
+    assert result.formula == "CuSO4\u00b75H2O"
+    assert result.method == "hydrate"
+
+    result2 = parse_compound_name("magnesium sulfate heptahydrate")
+    assert result2.formula == "MgSO4\u00b77H2O"
+
+
+def test_hydrate_checked_before_organic_for_more_conventional_notation():
+    """Real, surprising finding from testing: OPSIN can ALSO resolve
+    real hydrate names, but as a flat molecular formula (e.g.
+    'H10CuO9S') - chemically equivalent to, but less conventional than,
+    the standard hydrate notation with an explicit water-of-
+    crystallization dot. Hydrate checking is deliberately tried BEFORE
+    organic/OPSIN so the more standard notation wins."""
+    result = parse_compound_name("copper(II) sulfate pentahydrate")
+    assert result.method == "hydrate"
+    assert result.method != "organic"
+
+
+def test_hydrate_ambiguity_propagates_through_orchestrator():
+    result = parse_compound_name("iron oxide monohydrate")
+    assert result.ambiguous is True
+    assert set(result.all_candidates) == {"FeO\u00b71H2O", "Fe2O3\u00b71H2O"}
+
+
+def test_ordinary_organic_names_still_reach_opsin_after_hydrate_check():
+    """Confirms the new, cheap hydrate pre-check (a fast regex on the
+    last word) doesn't break the existing organic fallback path -
+    'ethanol' correctly falls all the way through to OPSIN, unaffected."""
+    result = parse_compound_name("ethanol")
+    assert result.formula == "C2H6O"
+    assert result.method == "organic"

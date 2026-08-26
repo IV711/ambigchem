@@ -119,6 +119,30 @@ def parse_compound_name(name: str) -> OrchestratorResult:
     # are an optional extra - if not installed, this stays unresolved
     # rather than crashing the whole orchestrator.
     if result.method == "unresolved":
+        # Rule 6, NEW: hydrate names (e.g. "copper(II) sulfate
+        # pentahydrate") - tried BEFORE organic/OPSIN, not after.
+        # Real, surprising finding from testing: OPSIN can ALSO resolve
+        # real hydrate names, but as a flat molecular formula (e.g.
+        # "H10CuO9S") - chemically equivalent to, but less conventional
+        # and less informative than, the standard hydrate notation with
+        # an explicit water-of-crystallization dot ("CuSO4\u00b75H2O").
+        # hydrates.py's own parse_hydrate_name() cheaply, immediately
+        # returns None for any non-hydrate-shaped input (just a regex
+        # check on the last word), so trying it first costs nothing
+        # extra for the vast majority of real queries that aren't
+        # hydrates - ordinary organic names fall through to OPSIN
+        # exactly as before. Closes a real, previously-open disconnect:
+        # hydrates.py was a complete, tested module with no path
+        # reaching it from here at all.
+        from ambigchem.hydrates import parse_hydrate_name
+        hydrate_result = parse_hydrate_name(name)
+        if hydrate_result.formula:
+            return OrchestratorResult(hydrate_result.formula, "hydrate")
+        if hydrate_result.ambiguous:
+            return OrchestratorResult(
+                None, "hydrate", ambiguous=True, all_candidates=hydrate_result.all_candidates
+            )
+
         try:
             from ambigchem.organic import parse_organic_name
             org = parse_organic_name(name)
