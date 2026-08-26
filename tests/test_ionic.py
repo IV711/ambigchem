@@ -129,3 +129,33 @@ def test_mercury_chloride_genuine_ambiguity():
 def test_mercury_roman_numerals_resolve_correctly():
     assert parse_ionic_name("mercury(I) chloride").formula == "Hg2Cl2"
     assert parse_ionic_name("mercury(II) chloride").formula == "HgCl2"
+
+
+def test_monatomic_smiles_generated_and_valid():
+    """Real, standard SMILES bracket-ion notation for purely monatomic
+    ion pairs - independently validated via RDKit (not just internally
+    self-consistent) before this test was written."""
+    from rdkit import Chem
+    from rdkit.Chem import rdMolDescriptors
+
+    result = parse_ionic_name("sodium chloride")
+    assert result.smiles == "[Na+].[Cl-]"
+    mol = Chem.MolFromSmiles(result.smiles)
+    assert mol is not None
+    assert rdMolDescriptors.CalcMolFormula(mol) in ("NaCl", "ClNa")
+
+
+def test_smiles_correctly_reflects_real_stoichiometry():
+    """Confirms ion COUNT, not just presence, is reflected in the
+    SMILES - calcium chloride needs two separate chloride ions."""
+    result = parse_ionic_name("calcium chloride")
+    assert result.smiles == "[Ca+2].[Cl-].[Cl-]"
+
+
+def test_polyatomic_case_smiles_honestly_none():
+    """Real, honest scope boundary: polyatomic ions (sulfate, carbonate)
+    need their own, individually-verified SMILES strings, not yet done -
+    smiles stays None rather than guessing."""
+    result = parse_ionic_name("aluminum carbonate")
+    assert result.formula == "Al2(CO3)3"
+    assert result.smiles is None

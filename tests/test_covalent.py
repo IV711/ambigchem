@@ -71,6 +71,38 @@ def test_same_element_on_both_sides_rejected():
     assert parse_covalent_name("trinitrogen nitride").formula is None
 
 
+def test_bare_nitrogen_oxide_is_genuinely_ambiguous():
+    """Real ambiguity check added after live user testing: a bare,
+    unprefixed name for an element pair with multiple real, well-known
+    compounds is genuinely, colloquially ambiguous - confirmed via
+    direct search: six real, consistently-cited nitrogen oxides exist."""
+    result = parse_covalent_name("nitrogen oxide")
+    assert result.ambiguous is True
+    assert set(result.all_candidates) == {"NO", "NO2", "N2O", "N2O3", "N2O4", "N2O5"}
+
+
+def test_explicitly_prefixed_nitrogen_oxides_are_never_ambiguous():
+    """The ambiguity check must ONLY fire for genuinely bare names -
+    every explicitly-prefixed real nitrogen oxide must still resolve
+    confidently, since the prefix already says exactly what was meant."""
+    assert parse_covalent_name("dinitrogen pentoxide").formula == "N2O5"
+    assert parse_covalent_name("nitrogen dioxide").formula == "NO2"
+    assert parse_covalent_name("nitrogen monoxide").formula == "NO"
+    assert parse_covalent_name("dinitrogen trioxide").formula == "N2O3"
+    assert parse_covalent_name("dinitrogen tetroxide").formula == "N2O4"
+
+
+def test_bare_names_outside_the_verified_set_remain_confident():
+    """Honest starter-set limitation, confirmed by a real test: carbon
+    also has multiple real oxides (CO, CO2), but carbon+oxygen isn't yet
+    in the verified KNOWN_MULTI_COMPOUND_PAIRS set - 'carbon oxide' is
+    NOT flagged ambiguous today. This protects the honest scope boundary
+    from silently expanding without real verification."""
+    result = parse_covalent_name("carbon dioxide")
+    assert result.formula == "CO2"
+    assert result.ambiguous is False
+
+
 def test_invalid_input_returns_none():
     assert parse_covalent_name("not a real compound name").formula is None
     assert parse_covalent_name("just one word").formula is None

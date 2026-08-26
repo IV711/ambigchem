@@ -20,7 +20,27 @@ already used for aluminum/aluminium in elements.py. Only mono, tetra,
 and penta are treated as elidable here, since those are the specific
 prefixes multiple independent sources confirmed; hexa/hepta/octa/nona/deca
 eliding before a vowel is NOT verified and is deliberately left
-unimplemented rather than guessed at.
+unimplemented rather than guessed at. CONFIRMED DECISIVELY, not merely
+unverified: IUPAC's own 2005 guide states plainly "there is no elision
+of vowels... except in the special case of monoxide" - extending
+elision further would be actively wrong, not just unconfirmed.
+
+REAL AMBIGUITY DETECTION, added after live user testing: a BARE,
+unprefixed name (e.g. "nitrogen oxide", no prefix on either word at
+all) for an element pair with multiple, real, well-known compounds is
+genuinely, colloquially ambiguous - confirmed via direct search: six
+real, consistently-cited nitrogen oxides exist (N2O, NO, NO2, N2O3,
+N2O4, N2O5), and casual usage of "nitrogen oxide" does not reliably
+specify which. This is architecturally DIFFERENT from ionic.py's
+ambiguity (which comes from a cation's variable real charge) - here,
+the literal parse of "nitrogen oxide" (no prefix -> count 1 on both
+sides) is technically well-defined as NO, but that would silently hide
+the real fact that this bare phrasing doesn't reliably distinguish
+between six genuine compounds. A small, curated, deliberately
+NOT-exhaustive starter set (KNOWN_MULTI_COMPOUND_PAIRS below) - adding
+more elements (sulfur, carbon, phosphorus, all of which also have
+multiple real oxides) would need their own real verification, not
+assumed from this one confirmed case.
 """
 
 from __future__ import annotations
@@ -120,6 +140,14 @@ def _all_prefix_candidates(word: str, base_lookup: dict[str, str]) -> list[tuple
 _ELEMENT_LOOKUP: dict[str, str] = {n.lower(): s for s, n in ELEMENT_DATA}
 _ELEMENT_LOOKUP.update(SPELLING_VARIANTS)  # real bug fix: "sulphur" etc. were missing here
 
+# Real, curated (element, element) pairs where multiple, distinct, real,
+# well-known compounds exist at different prefix combinations - see
+# module docstring for the real, search-confirmed reasoning. A
+# deliberate starter set: only nitrogen+oxygen is confirmed here.
+KNOWN_MULTI_COMPOUND_PAIRS: dict[tuple[str, str], list[str]] = {
+    ("N", "O"): ["NO", "NO2", "N2O", "N2O3", "N2O4", "N2O5"],
+}
+
 
 def parse_covalent_name(name: str) -> CovalentParseResult:
     words = name.strip().lower().split()
@@ -157,6 +185,27 @@ def parse_covalent_name(name: str) -> CovalentParseResult:
 
     if len(unique_by_formula) == 1:
         formula, count1, count2 = unique_by_formula[0]
+
+        # Real ambiguity check: only when BOTH words matched with no
+        # prefix at all (a genuinely bare name), and the element pair
+        # is a confirmed, real "multiple known compounds" case. A name
+        # with an EXPLICIT prefix ("dinitrogen pentoxide") is a specific,
+        # correctly-identified compound, never flagged here. Uses
+        # first_candidates[0][1]/second_candidates[0][1] explicitly
+        # (not leftover s1/s2 from the loop above) - a bare word always
+        # produces exactly one candidate (confirmed directly), but
+        # relying on loop-leftover variables here would be fragile and
+        # non-obviously correct, not actually wrong today but not
+        # worth keeping that way.
+        if words[0] in _ELEMENT_LOOKUP and words[1] in IDE_FORMS:
+            bare_symbol1 = first_candidates[0][1]
+            bare_symbol2 = second_candidates[0][1]
+            known_compounds = KNOWN_MULTI_COMPOUND_PAIRS.get((bare_symbol1, bare_symbol2))
+            if known_compounds:
+                return CovalentParseResult(
+                    None, None, None, ambiguous=True, all_candidates=list(known_compounds),
+                )
+
         return CovalentParseResult(formula, count1, count2, ambiguous=False)
 
     # Genuine ambiguity - more than one distinct, independently valid

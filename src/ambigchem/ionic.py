@@ -136,6 +136,7 @@ class IonicParseResult:
     formula: str | None
     ambiguous: bool = False
     all_candidates: list[str] | None = None
+    smiles: str | None = None  # only populated for the fully-monatomic case - see _monatomic_ionic_smiles
 
 
 def _lookup_anion(word: str) -> tuple[str, int, bool] | None:
@@ -188,7 +189,7 @@ def _parse_cation(text: str) -> list[tuple[str, int, bool]]:
 
 
 def _balance(cation_symbol: str, cation_charge: int, cation_is_poly: bool,
-             anion_symbol: str, anion_charge: int, anion_is_poly: bool) -> str:
+             anion_symbol: str, anion_charge: int, anion_is_poly: bool) -> tuple[str, int, int]:
     a, b = abs(cation_charge), abs(anion_charge)
     lcm = a * b // math.gcd(a, b)
     cation_count = lcm // a
@@ -204,7 +205,30 @@ def _balance(cation_symbol: str, cation_charge: int, cation_is_poly: bool,
     else:
         anion_part = anion_symbol + (str(anion_count) if anion_count > 1 else "")
 
-    return cation_part + anion_part
+    return cation_part + anion_part, cation_count, anion_count
+
+
+def _ion_smiles_token(symbol: str, charge: int) -> str:
+    """Real, standard SMILES bracket-ion notation for a single ion -
+    e.g. Na+ -> '[Na+]', Ca2+ -> '[Ca+2]', Cl- -> '[Cl-]'."""
+    sign = "+" if charge > 0 else "-"
+    magnitude = abs(charge)
+    charge_str = sign if magnitude == 1 else f"{sign}{magnitude}"
+    return f"[{symbol}{charge_str}]"
+
+
+def _monatomic_ionic_smiles(cation_symbol: str, cation_charge: int, cation_count: int,
+                             anion_symbol: str, anion_charge: int, anion_count: int) -> str:
+    """Real SMILES for a purely monatomic-ion pair (e.g. NaCl, CaCl2,
+    MgO) - repeated ions separated by '.', the real, standard SMILES
+    convention for disconnected components. Deliberately NOT used for
+    polyatomic ions (sulfate, carbonate, ammonium...) - those need
+    their own, individually-verified real SMILES strings, a real,
+    honest, separate follow-up not yet done, not silently guessed at."""
+    cation_token = _ion_smiles_token(cation_symbol, cation_charge)
+    anion_token = _ion_smiles_token(anion_symbol, anion_charge)
+    parts = [cation_token] * cation_count + [anion_token] * anion_count
+    return ".".join(parts)
 
 
 def parse_ionic_name(name: str) -> IonicParseResult:
@@ -223,15 +247,25 @@ def parse_ionic_name(name: str) -> IonicParseResult:
     if not cation_candidates:
         return IonicParseResult(None)
 
-    formulas = [
+    results = [
         _balance(c_sym, c_chg, c_poly, anion_symbol, anion_charge, anion_is_poly)
         for c_sym, c_chg, c_poly in cation_candidates
     ]
-    unique = list(dict.fromkeys(formulas))
+    formulas = [r[0] for r in results]
+    unique_formulas = list(dict.fromkeys(formulas))
 
-    if len(unique) == 1:
-        return IonicParseResult(unique[0], ambiguous=False)
-    return IonicParseResult(None, ambiguous=True, all_candidates=unique)
+    if len(unique_formulas) == 1:
+        formula, cation_count, anion_count = results[0]
+        cation_symbol_used, cation_charge_used, cation_poly_used = cation_candidates[0]
+
+        smiles = None
+        if not cation_poly_used and not anion_is_poly:
+            smiles = _monatomic_ionic_smiles(
+                cation_symbol_used, cation_charge_used, cation_count,
+                anion_symbol, anion_charge, anion_count,
+            )
+        return IonicParseResult(formula, ambiguous=False, smiles=smiles)
+    return IonicParseResult(None, ambiguous=True, all_candidates=unique_formulas)
 
 
 if __name__ == "__main__":
