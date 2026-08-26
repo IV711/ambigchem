@@ -109,8 +109,34 @@ _MERCURY_CANDIDATES: dict[int, tuple[str, int, bool]] = {
     2: ("Hg", 2, False),    # mercury(II): the ordinary, simple Hg2+ ion
 }
 
+# Real, classical -ous/-ic naming convention: -ous = LOWER charge, -ic =
+# HIGHER charge, confirmed via multiple, independent, consistent real
+# sources. Added ONLY where BOTH the classical name AND the specific
+# underlying charge are directly, independently confirmed for a cation
+# already verified in this file - not assumed from the pattern alone.
+#
+# HONEST, REAL BACKLOG: "cobaltic" and "manganous" both appeared in real
+# sources, but never their counterpart in the SAME sources - left out
+# rather than guessed at (is "cobaltous" really Co2+? Probably, but not
+# independently confirmed here). Gold's real "aurous"/"auric" names are
+# also confirmed real, but gold isn't in this file's cation data at all
+# yet - a separate, bigger addition needing its own verification pass.
+#
+# Maps directly to the SAME "elementname(romannumeral)" representation
+# the rest of this module already handles - reuses ALL existing charge
+# and mercury-special-case logic, nothing duplicated.
+CLASSICAL_CATION_NAMES: dict[str, str] = {
+    "ferrous": "iron(II)", "ferric": "iron(III)",
+    "cuprous": "copper(I)", "cupric": "copper(II)",
+    "stannous": "tin(II)", "stannic": "tin(IV)",
+    "plumbous": "lead(II)", "plumbic": "lead(IV)",
+    "mercurous": "mercury(I)", "mercuric": "mercury(II)",
+}
+
 # Real, looked-up polyatomic anions - charge is not derivable from any
-# rule, must be a real fact. (formula, charge)
+# rule, must be a real fact. (formula, charge). chromate/sulfite/
+# nitrite/oxalate/thiosulfate/peroxide added after direct search
+# confirmation across multiple, independent, consistent real sources.
 POLYATOMIC_ANIONS: dict[str, tuple[str, int]] = {
     "carbonate": ("CO3", -2), "sulfate": ("SO4", -2),
     "nitrate": ("NO3", -1), "phosphate": ("PO4", -3),
@@ -119,6 +145,9 @@ POLYATOMIC_ANIONS: dict[str, tuple[str, int]] = {
     # dichromate/permanganate added after live user testing found the
     # gap - confirmed via search: Cr2O7 (-2), MnO4 (-1).
     "dichromate": ("Cr2O7", -2), "permanganate": ("MnO4", -1),
+    "chromate": ("CrO4", -2), "sulfite": ("SO3", -2),
+    "nitrite": ("NO2", -1), "oxalate": ("C2O4", -2),
+    "thiosulfate": ("S2O3", -2), "peroxide": ("O2", -2),
 }
 
 # Simple monatomic anion charge, reliable ONLY for these groups
@@ -157,6 +186,14 @@ def _parse_cation(text: str) -> list[tuple[str, int, bool]]:
     cations WITHOUT an explicit Roman numeral give MULTIPLE - genuine,
     algorithmic ambiguity."""
     text = text.strip().lower()
+
+    # Real, classical -ous/-ic name -> translate to the equivalent
+    # "elementname(romannumeral)" form, then fall straight through the
+    # SAME logic below unchanged - "cuprous" becomes "copper(i)",
+    # exactly as if the user had typed the Roman numeral explicitly.
+    if text in CLASSICAL_CATION_NAMES:
+        text = CLASSICAL_CATION_NAMES[text].lower()
+
     roman_match = re.search(r"\(([ivx]+)\)", text)
     explicit_charge = None
     if roman_match:

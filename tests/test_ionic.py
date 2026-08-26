@@ -159,3 +159,49 @@ def test_polyatomic_case_smiles_honestly_none():
     result = parse_ionic_name("aluminum carbonate")
     assert result.formula == "Al2(CO3)3"
     assert result.smiles is None
+
+
+def test_classical_ous_ic_naming():
+    """Real, classical -ous/-ic naming convention, confirmed via
+    multiple independent real sources: -ous = lower charge, -ic =
+    higher charge. Only added where both the name AND the charge are
+    directly confirmed for a cation already verified in this file."""
+    assert parse_ionic_name("ferrous chloride").formula == "FeCl2"
+    assert parse_ionic_name("ferric chloride").formula == "FeCl3"
+    assert parse_ionic_name("cuprous oxide").formula == "Cu2O"
+    assert parse_ionic_name("cupric oxide").formula == "CuO"
+    assert parse_ionic_name("stannous fluoride").formula == "SnF2"
+    assert parse_ionic_name("stannic fluoride").formula == "SnF4"
+    assert parse_ionic_name("plumbous oxide").formula == "PbO"
+    assert parse_ionic_name("plumbic oxide").formula == "PbO2"
+
+
+def test_mercury_classical_names_reuse_the_real_dimeric_case():
+    """Mercurous/mercuric correctly reuse mercury's existing, real,
+    dimeric-ion special case - mercurous chloride is the real compound
+    calomel (Hg2Cl2), not two independent Hg+ ions."""
+    assert parse_ionic_name("mercurous chloride").formula == "Hg2Cl2"
+    assert parse_ionic_name("mercuric chloride").formula == "HgCl2"
+
+
+def test_cuprous_oxide_now_resolves_directly_via_ionic_not_opsin():
+    """A genuine full-circle fix: 'cuprous oxide' previously produced a
+    malformed formula via a real OPSIN misinterpretation (correctly
+    rejected earlier), then fell back to 'unresolved' entirely. Now
+    resolves confidently and correctly through ionic.py directly,
+    closing the real gap for good."""
+    result = parse_ionic_name("cuprous oxide")
+    assert result.formula == "Cu2O"
+    assert result.ambiguous is False
+
+
+def test_new_polyatomic_anions():
+    """chromate/sulfite/nitrite/oxalate/thiosulfate/peroxide, confirmed
+    via direct search across multiple, independent, consistent real
+    sources before being added."""
+    assert parse_ionic_name("potassium chromate").formula == "K2CrO4"
+    assert parse_ionic_name("sodium sulfite").formula == "Na2SO3"
+    assert parse_ionic_name("sodium nitrite").formula == "NaNO2"
+    assert parse_ionic_name("sodium oxalate").formula == "Na2C2O4"
+    assert parse_ionic_name("sodium thiosulfate").formula == "Na2S2O3"
+    assert parse_ionic_name("sodium peroxide").formula == "Na2O2"

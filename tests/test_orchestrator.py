@@ -119,3 +119,19 @@ def test_covalent_and_ionic_still_take_priority_over_organic():
 
     result2 = parse_compound_name("aluminum oxide")
     assert result2.method == "ionic"
+
+
+def test_classical_ous_ic_naming_resolves_via_ionic_through_orchestrator():
+    """Classical names ('ferrous', 'cuprous') aren't literal keys in
+    FIXED_CATIONS/VARIABLE_CATIONS, so the routing heuristic's direct
+    shortcut doesn't specifically recognize them - this confirms the
+    fallback 'try both, compare' path handles it correctly anyway,
+    since covalent.py genuinely fails on a non-element first word while
+    ionic.py's real classical-name translation succeeds."""
+    result = parse_compound_name("ferrous chloride")
+    assert result.formula == "FeCl2"
+    assert result.method == "ionic"
+
+    result2 = parse_compound_name("cuprous oxide")
+    assert result2.formula == "Cu2O"
+    assert result2.method == "ionic"
