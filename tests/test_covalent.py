@@ -103,6 +103,60 @@ def test_bare_names_outside_the_verified_set_remain_confident():
     assert result.ambiguous is False
 
 
+def test_sulfur_oxide_ambiguity_excludes_unstable_so():
+    """Real, precise verification: sulfur has multiple real oxides, but
+    unlike nitrogen, only SO2/SO3 are confirmed 'common/important' -
+    sulfur monoxide (SO) is confirmed unstable, 'rarely found outside
+    of space' - deliberately excluded, not assumed to fit the same
+    6-candidate pattern nitrogen has."""
+    result = parse_covalent_name("sulfur oxide")
+    assert result.ambiguous is True
+    assert set(result.all_candidates) == {"SO2", "SO3"}
+
+
+def test_carbon_oxide_ambiguity_excludes_uncommon_suboxide():
+    """Real, precise verification: Britannica directly confirms carbon
+    forms 'two well-known oxides' (CO, CO2) - carbon suboxide (C3O2)
+    exists but is confirmed 'uncommon'/'rarely encountered', not
+    included."""
+    result = parse_covalent_name("carbon oxide")
+    assert result.ambiguous is True
+    assert set(result.all_candidates) == {"CO", "CO2"}
+
+
+def test_phosphorus_oxide_ambiguity_uses_real_tetrameric_formulas():
+    """Real, precise verification: Britannica directly confirms
+    phosphorus forms 'two common oxides' - P4O6 and P4O10, using the
+    real tetraphosphorus convention. The bare, unprefixed literal parse
+    ('PO') is not even a real, well-known compound itself - correctly
+    intercepted before ever being returned."""
+    result = parse_covalent_name("phosphorus oxide")
+    assert result.ambiguous is True
+    assert set(result.all_candidates) == {"P4O6", "P4O10"}
+
+
+def test_hexa_elision_both_forms_work():
+    """Real, NEW verification finding: unlike hepta/octa/nona/deca
+    (still unconfirmed), hexa's elided form is confirmed via multiple,
+    independent, real sources - Wikipedia's own infobox uses
+    'hexaoxide' while its body text uses 'hexoxide' for the same real
+    compound; multiple patent documents consistently use the elided
+    'tetraarsenic hexoxide' for the analogous As4O6. Both forms must
+    resolve to the same real compound."""
+    assert parse_covalent_name("tetraphosphorus hexoxide").formula == "P4O6"
+    assert parse_covalent_name("tetraphosphorus hexaoxide").formula == "P4O6"
+
+
+def test_hepta_octa_nona_deca_elision_still_deliberately_unverified():
+    """Protects the honest scope boundary: hexa's elision being
+    confirmed does NOT mean hepta/octa/nona/deca are assumed to share
+    the pattern - only the elided form of hexa is accepted, the
+    strict, non-elided forms of the others still work correctly."""
+    assert parse_covalent_name("tetraphosphorus decaoxide").formula == "P4O10"
+    # A hypothetically-elided "decoxide" is deliberately NOT recognized
+    assert parse_covalent_name("tetraphosphorus decoxide").formula is None
+
+
 def test_invalid_input_returns_none():
     assert parse_covalent_name("not a real compound name").formula is None
     assert parse_covalent_name("just one word").formula is None

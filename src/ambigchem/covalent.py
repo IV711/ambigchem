@@ -16,9 +16,9 @@ coexist in current practice.
 
 Rather than enforce one convention as "correct," this engine accepts
 BOTH forms as valid input - the same "real spelling variants" design
-already used for aluminum/aluminium in elements.py. Only mono, tetra,
-and penta are treated as elidable here, since those are the specific
-prefixes multiple independent sources confirmed; hexa/hepta/octa/nona/deca
+already used for aluminum/aluminium in elements.py. mono, tetra, penta,
+and hexa are treated as elidable here, since those are the specific
+prefixes multiple independent sources confirmed; hepta/octa/nona/deca
 eliding before a vowel is NOT verified and is deliberately left
 unimplemented rather than guessed at. CONFIRMED DECISIVELY, not merely
 unverified: IUPAC's own 2005 guide states plainly "there is no elision
@@ -52,10 +52,16 @@ PREFIXES: dict[str, int] = {
     "hexa": 6, "hepta": 7, "octa": 8, "nona": 9, "deca": 10,
 }
 
-# Confirmed via direct source-checking - see module docstring. Deliberately
-# does NOT include hexa/hepta/octa/nona/deca, since their elision before a
-# vowel was not verified.
-_ELIDABLE_PREFIXES = {"mono", "tetra", "penta"}
+# Confirmed via direct source-checking - see module docstring.
+# "hexa" added after NEW, decisive evidence found while verifying
+# phosphorus oxides: Wikipedia's OWN infobox for P4O6 says "Tetraphosphorus
+# hexaoxide" while its body text says "hexoxide"; multiple patent
+# documents consistently use "tetraarsenic hexoxide" (As4O6, the
+# analogous compound) - the same real-world "both forms genuinely used"
+# pattern that already justified accepting both for tetra/penta.
+# hepta/octa/nona/deca remain deliberately unverified - NOT assumed to
+# share this pattern just because hexa did.
+_ELIDABLE_PREFIXES = {"mono", "tetra", "penta", "hexa"}
 
 # The "-ide" form used for the second element in a binary covalent name.
 # Genuinely irregular real IUPAC forms - not derivable from element names
@@ -142,10 +148,30 @@ _ELEMENT_LOOKUP.update(SPELLING_VARIANTS)  # real bug fix: "sulphur" etc. were m
 
 # Real, curated (element, element) pairs where multiple, distinct, real,
 # well-known compounds exist at different prefix combinations - see
-# module docstring for the real, search-confirmed reasoning. A
-# deliberate starter set: only nitrogen+oxygen is confirmed here.
+# module docstring for the real, search-confirmed reasoning.
+#
+# Each pair's candidate list is deliberately the CONFIRMED "common"/
+# "important" set, not every real oxide that exists - genuinely
+# different sources agree on different scopes per element, verified
+# individually rather than assumed to generalize:
+#   - Nitrogen: 6 oxides, ALL consistently, equally cited together
+#     across sources as real nitrogen oxides (N2O, NO, NO2, N2O3, N2O4,
+#     N2O5).
+#   - Sulfur: SO2/SO3 specifically confirmed as "the most important/
+#     common" - SO exists but multiple sources separately describe it
+#     as "less stable", part of the "lower sulfur oxides" category, NOT
+#     among the common ones.
+#   - Carbon: CO/CO2 confirmed as "the two most commonly encountered" -
+#     other real oxides (carbon suboxide C3O2, etc.) exist but are
+#     consistently described as "rare"/"unstable"/"metastable".
+#   - Phosphorus: P4O6/P4O10 - Britannica directly: "phosphorus forms
+#     two common oxides" - uses the real, confirmed TETRAMERIC formula
+#     convention, not the simpler empirical P2O3/P2O5 forms.
 KNOWN_MULTI_COMPOUND_PAIRS: dict[tuple[str, str], list[str]] = {
     ("N", "O"): ["NO", "NO2", "N2O", "N2O3", "N2O4", "N2O5"],
+    ("S", "O"): ["SO2", "SO3"],
+    ("C", "O"): ["CO", "CO2"],
+    ("P", "O"): ["P4O6", "P4O10"],
 }
 
 
