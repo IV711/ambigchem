@@ -7,7 +7,7 @@ name = "ambigchem"
 version = "0.1.0"
 description = "A disambiguation-first chemistry name and formula resolution library"
 readme = "README.md"
-license = {text = "MIT"}
+license = "MIT"
 authors = [
     {name = "Madumitha I V", email = "madumithaot7@gmail.com"}
 ]
