@@ -179,7 +179,9 @@ class ValidatedSuffixMatch:
     smiles: str | None
 
 
-def validate_suffix_candidates(candidates: list[SuffixCandidate]) -> list[ValidatedSuffixMatch]:
+def validate_suffix_candidates(
+    candidates: list[SuffixCandidate], reject_cache_path: str | None = None
+) -> list[ValidatedSuffixMatch]:
     """Phase 4: the step that actually redeems Phase 3's honestly-low
     precision. Runs each candidate through OPSIN (reusing organic.py's
     already-proven parse_organic_name() directly, not reimplementing
@@ -193,17 +195,36 @@ def validate_suffix_candidates(candidates: list[SuffixCandidate]) -> list[Valida
     non-trivial latency (a genuine subprocess launch, confirmed
     throughout organic.py's own testing) - this function is not free to
     run on every word in a large document, which is exactly why Phase 3
-    exists as a pre-filter in the first place, not to be skipped."""
+    exists as a pre-filter in the first place, not to be skipped.
+
+    `reject_cache_path`, optional: a real, persistent, REAL-TIME cache
+    of words OPSIN has already, definitively rejected - found valuable
+    via live benchmarking, where the exact same non-chemical distractor
+    words ("thermal", "radical", "orbital"...) recurred across many
+    different real queries, each one paying a real, full OPSIN
+    subprocess cost again. OPSIN's answer for a given string is
+    deterministic - a rejection once is a rejection always - so once
+    cached, a word never needs a real OPSIN call again, in this run or
+    any future one. Updated the MOMENT a rejection happens, not
+    batched or deferred. Explicitly opt-in (None by default): existing
+    callers see no behavior change and no surprise cache file."""
     from ambigchem.organic import parse_organic_name
+    from ambigchem.opsin_rejection_cache import load_rejection_cache, add_to_rejection_cache
+
+    rejected = load_rejection_cache(reject_cache_path) if reject_cache_path else set()
 
     validated: list[ValidatedSuffixMatch] = []
     for candidate in candidates:
+        if candidate.text.lower() in rejected:
+            continue  # real, already-confirmed rejection - no OPSIN call needed
         result = parse_organic_name(candidate.text)
         if result.formula:
             validated.append(ValidatedSuffixMatch(
                 candidate.text, candidate.start, candidate.end,
                 candidate.suffix, result.formula, result.smiles,
             ))
+        elif reject_cache_path:
+            add_to_rejection_cache(candidate.text, reject_cache_path)
     return validated
 
 
@@ -322,7 +343,8 @@ class ExtractedCompound:
     formula: str | None = None  # populated for "formula" and "opsin_validated"
 
 
-def extract_all(text: str, trie: marisa_trie.Trie, db_path: str | None = None) -> list[ExtractedCompound]:
+def extract_all(text: str, trie: marisa_trie.Trie, db_path: str | None = None,
+                 opsin_reject_cache_path: str | None = None) -> list[ExtractedCompound]:
     """The unified entry point, combining all four independently-proven
     phases - built only now that each stands on its own real evidence,
     per the original, explicit design intent: 'I would not immediately
@@ -371,7 +393,7 @@ def extract_all(text: str, trie: marisa_trie.Trie, db_path: str | None = None) -
         # carried formula=None even though the matched text is the answer.
         combined.append(ExtractedCompound(m.text, m.start, m.end, "formula", formula=m.text))
 
-    validated = validate_suffix_candidates(discover_suffix_candidates(text))
+    validated = validate_suffix_candidates(discover_suffix_candidates(text), reject_cache_path=opsin_reject_cache_path)
     for v in validated:
         combined.append(ExtractedCompound(v.text, v.start, v.end, "opsin_validated", formula=v.formula))
 
