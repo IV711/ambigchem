@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ambigchem"
-version = "0.1.1"
+version = "0.1.2"
 description = "A disambiguation-first chemistry name and formula resolution library"
 readme = "README.md"
 license = "MIT"
