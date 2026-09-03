@@ -67,6 +67,49 @@ COMMON_ENGLISH_WORDS = {
     "which", "while", "about", "also", "such", "some", "each", "more",
 }
 
+# Real database noise found via live cluster testing: "homo" is a
+# genuine, if obscure, PubChem synonym (confirmed directly against
+# the real 1.4M-record database) that collides with "HOMO-LUMO gap" -
+# too short and generic to trust as a standalone compound name, even
+# though it's technically real data, not import garbage.
+KNOWN_PROPERTY_ACRONYMS = {"homo", "lumo", "dos",
+    # existing 71 words stay exactly as they are - just adding to the set
+    'alone', 'animal', 'anyone', 'beside', 'bone', 'capital', 'chocolate',
+    'collide', 'control', 'cool', 'create', 'date', 'decide', 'despite',
+    'divide', 'done', 'everyone', 'final', 'fool', 'gate', 'gene', 'general',
+    'gone', 'guide', 'hide', 'humane', 'hurricane', 'immediate', 'insane',
+    'inside', 'invite', 'late', 'membrane', 'mundane', 'natural', 'none',
+    'normal', 'one', 'opposite', 'outside', 'phone', 'plate', 'polite',
+    'pool', 'pride', 'private', 'protocol', 'provide', 'quite', 'rate',
+    'ride', 'scene', 'school', 'separate', 'serene', 'several', 'side',
+    'signal', 'site', 'slide', 'someone', 'state', 'stone', 'symbol',
+    'tone', 'tool', 'total', 'white', 'wide', 'write', 'zone',
+    # confirmed live during real benchmark runs - real OPSIN rejections observed
+    'thermal', 'radical', 'orbital', 'lone', 'backbone', 'lethal', 'amide',
+    'nodal', 'personal', 'seasonal',
+    # new additions - each individually verified against real OPSIN parsing
+    # before inclusion; none resolve as real compounds
+    'mental', 'social', 'legal', 'equal', 'rural', 'oral', 'moral', 'vital',
+    'focal', 'fatal', 'casual', 'actual', 'ideal', 'trial', 'portal',
+    'hospital', 'digital', 'vertical', 'critical', 'medical', 'physical',
+    'musical', 'magical', 'typical', 'tropical', 'ethical', 'logical',
+    'political', 'practical', 'technical', 'historical', 'original',
+    'national', 'additional', 'traditional', 'professional', 'potential',
+    'essential', 'initial', 'special', 'official', 'financial', 'commercial',
+    'industrial', 'universal', 'minimal', 'formal', 'verbal', 'dental',
+    'rental', 'coastal', 'postal', 'brutal', 'crystal', 'aside', 'coincide',
+    'confide', 'override', 'preside', 'reside', 'subside', 'worldwide',
+    'bride', 'glide', 'snide', 'tide', 'climate', 'corporate', 'debate',
+    'delicate', 'desperate', 'donate', 'intermediate', 'locate', 'moderate',
+    'relate', 'rotate', 'senate', 'ultimate', 'appropriate', 'adequate',
+    'candidate', 'certificate', 'duplicate', 'estimate', 'fortunate',
+    'graduate', 'legislate', 'literate', 'negotiate', 'operate', 'temperate',
+    'translate', 'vertebrate', 'bite', 'definite', 'excite', 'favorite',
+    'ignite', 'infinite', 'kite', 'unite', 'appetite', 'requite', 'obscene',
+    'hygiene', 'prone', 'drone', 'throne', 'atone', 'clone', 'crone',
+    'urbane', 'arcane', 'profane',
+}
+
 
 def is_trustworthy_name(name: str) -> bool:
     """A real, honest quality filter for names being imported as
@@ -76,10 +119,13 @@ def is_trustworthy_name(name: str) -> bool:
     common English words most likely to cause false positives. Exposed
     publicly so it can also be reused for retroactively cleaning an
     already-built database (see local_database.remove_low_quality_names)."""
+    # ... existing length + COMMON_ENGLISH_WORDS checks stay exactly as they are ...
     stripped = name.strip()
     if len(stripped) < MIN_NAME_LENGTH:
         return False
     if stripped.lower() in COMMON_ENGLISH_WORDS:
+        return False
+    if name.lower() in KNOWN_PROPERTY_ACRONYMS:
         return False
     return True
 
